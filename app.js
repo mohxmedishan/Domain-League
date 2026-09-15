@@ -94,35 +94,29 @@ function paintNav({ hasUser, profile }) {
   bindAuthButtons();
   renderHeroCta(hasUser);
 }
-function renderHeroCta(hasUser) {
+function renderHeroCta() {
   const btn = document.getElementById('heroCtaPrimary');
   if (!btn) return;
-  if (!hasUser) {
+
+  // Read state DIRECTLY — never trust an argument
+  const isLoggedIn = !!currentUser || !!readCache()?.uid;
+  if (!isLoggedIn) {
     btn.textContent = 'Create your account';
     btn.onclick = () => openAuthModal('signup');
     return;
   }
+
   const hasName = !!(currentProfile && currentProfile.username);
   btn.textContent = hasName ? 'View your card' : 'Set your username';
   btn.onclick = () => {
-    if (!hasName) {
-      openAccountModal('username');
-      return;
+    if (!hasName) { openAccountModal('username'); return; }
+    const target = document.getElementById('youSection');
+    if (target) {
+      target.hidden = false;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    // Make sure the card is visible before scrolling to it
-    youSection.hidden = false;
-    youSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // Flash it so you can see it's the target
-    youSection.animate(
-      [{ outline: '2px solid transparent' },
-       { outline: '2px solid var(--accent)' },
-       { outline: '2px solid transparent' }],
-      { duration: 1200, easing: 'ease-out' }
-    );
   };
-}
-
-/* ---------- AUTH MODAL ---------- */
+}/* ---------- AUTH MODAL ---------- */
 function openAuthModal(mode = 'login') {
   setAuthMode(mode, { preserveValues: false });
   authModal.hidden = false;
