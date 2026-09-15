@@ -1,1 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Domain League — Small games. Big bragging rights.</title>
+<meta name="description" content="A tiny corner of the internet where you play games and climb the ranks." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
 
+<div class="glow glow-a"></div>
+<div class="glow glow-b"></div>
+
+<!-- NAV -->
+<header class="nav">
+  <a href="#" class="brand">
+    <span class="brand-mark">DL</span>
+    <span class="brand-text">Domain League</span>
+  </a>
+  <nav class="nav-links">
+    <a href="#arcade">Arcade</a>
+    <a href="#leaderboard">Leaderboard</a>
+  </nav>
+  <div class="nav-auth" id="navAuth">
+    <button class="btn btn-ghost" data-open-auth="login">Log in</button>
+    <button class="btn btn-primary" data-open-auth="signup">Sign up</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="pill">🎮 Season 1 — Now Loading</div>
+  <h1>Small games.<br /><span class="grad">Big bragging rights.</span></h1>
+  <p class="hero-sub">
+    Domain League is a tiny arcade on the internet. Play one game, chase the top
+    of the board, and prove you're built different.
+  </p>
+  <div class="hero-cta">
+    <button class="btn btn-primary btn-lg" data-open-auth="signup">Create your account</button>
+    <a href="#arcade" class="btn btn-ghost btn-lg">Browse the arcade</a>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat"><strong id="statPlayers">—</strong><span>Players</span></div>
+    <div class="stat"><strong id="statGames">1</strong><span>Game</span></div>
+    <div class="stat"><strong id="statHigh">—</strong><span>Top score</span></div>
+  </div>
+</section>
+
+<!-- ARCADE -->
+<section class="section" id="arcade">
+  <div class="section-head">
+    <h2>The Arcade</h2>
+    <p>One game live. More cooking.</p>
+  </div>
+  <div class="game-grid">
+    <article class="game-card featured">
+      <div class="game-thumb">🎯</div>
+      <div class="game-body">
+        <div class="badge">Featured</div>
+        <h3>Game 01</h3>
+        <p>Your first title goes here. Wire it up and let the grind begin.</p>
+        <button class="btn btn-primary btn-block" disabled>Coming Soon</button>
+      </div>
+    </article>
+    <article class="game-card locked"><div class="game-thumb">🔒</div><span>Slot 02</span></article>
+    <article class="game-card locked"><div class="game-thumb">🔒</div><span>Slot 03</span></article>
+  </div>
+</section>
+
+<!-- LEADERBOARD -->
+<section class="section" id="leaderboard">
+  <div class="section-head">
+    <h2>Hall of Fame</h2>
+    <p>Top 10 players across all games.</p>
+  </div>
+  <div class="board" id="board">
+    <div class="board-loading">Loading rankings…</div>
+  </div>
+</section>
+
+<!-- YOUR STATS -->
+<section class="section" id="youSection" hidden>
+  <div class="section-head"><h2>Your Card</h2><p>Signed in as <span id="youName"></span></p></div>
+  <div class="stats-bar">
+    <div class="stat"><strong id="youScore">0</strong><span>Total score</span></div>
+    <div class="stat"><strong id="youGames">0</strong><span>Games played</span></div>
+    <div class="stat"><strong id="youRank">—</strong><span>Global rank</span></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <span>© <span id="year"></span> Domain League</span>
+  <span class="dot">•</span>
+  <span>Built for people who refresh leaderboards at 3am.</span>
+</footer>
+
+<!-- AUTH MODAL -->
+<div class="modal-backdrop" id="authModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+    <div class="modal-tabs">
+      <button data-tab="login" class="active">Log in</button>
+      <button data-tab="signup">Sign up</button>
+    </div>
+    <form id="authForm" novalidate>
+      <label class="field" id="usernameField">
+        <span>Username</span>
+        <input type="text" id="username" placeholder="e.g. shadowbyte" autocomplete="username" />
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="password" placeholder="At least 6 characters" autocomplete="current-password" />
+      </label>
+      <p class="form-error" id="formError"></p>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">Log in</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
