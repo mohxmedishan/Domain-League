@@ -24,16 +24,16 @@ if (FIREBASE_READY) {
 }
 
 /* =========================================================
-   USER CACHE — instant nav paint, zero flash
+   USER CACHE
    ========================================================= */
-const CACHE_KEY = 'dl_user_cache_v1';
+const CACHE_KEY = 'dl_user_cache_v2';
 function readCache() {
   try { const r = localStorage.getItem(CACHE_KEY); return r ? JSON.parse(r) : null; }
   catch { return null; }
 }
 function writeCache(profile) {
   try {
-    if (profile) localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+    if (profile && profile.uid) localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
     else localStorage.removeItem(CACHE_KEY);
   } catch {}
 }
@@ -41,10 +41,9 @@ function writeCache(profile) {
 /* =========================================================
    STATE
    ========================================================= */
-let currentUser = null;
-let currentProfile = null;
+let currentUser = null;      // Firebase user (source of truth: logged in?)
+let currentProfile = null;   // { uid, username, totalScore, gamesPlayed }
 let authMode = 'login';
-let acctTab = 'username';
 
 /* =========================================================
    DOM
@@ -60,6 +59,7 @@ const usernameField = $('usernameField');
 const board = $('board');
 const youSection = $('youSection');
 const toast = $('toast');
+const heroCtaPrimary = $('heroCtaPrimary');
 
 /* =========================================================
    HELPERS
@@ -70,7 +70,7 @@ function showToast(msg, ms = 2600) {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => (toast.hidden = true), ms);
 }
-function initials(name) { return (name || '?').trim().slice(0, 2).toUpperCase(); }
+function initials(name) { return (name || '?').trim().slice(0, 2).toUpperCase() || '?'; }
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -100,29 +100,63 @@ const ERRORS = {
 const friendlyError = (err) => ERRORS[err?.code] || err?.message || 'Something went wrong.';
 
 /* =========================================================
-   NAV
+   NAV — decides guest vs. user by Firebase USER, not profile
    ========================================================= */
-function paintNavFromProfile(profile) {
-  if (!profile || !profile.username) {
+function paintNav({ hasUser, profile }) {
+  if (!hasUser) {
     navAuth.innerHTML = `
-      <button class="btn btn-ghost" data-open-auth="login">Log in</button>
-      <button class="btn btn-primary" data-open-auth="signup">Sign up</button>`;
+      <button class="btn btn-ghost" data-open-auth="login" type="button">Log in</button>
+      <button class="btn btn-primary" data-open-auth="signup" type="button">Sign up</button>`;
   } else {
+    const hasName = !!(profile && profile.username);
+    const displayName = hasName ? profile.username : 'Set username';
+    const avatarCls = hasName ? 'avatar' : 'avatar placeholder';
+    const chipCls = hasName ? 'user-chip' : 'user-chip incomplete';
     navAuth.innerHTML = `
-      <button class="user-chip" id="userChip" type="button" title="Account settings">
-        <span class="avatar">${esc(initials(profile.username))}</span>
-        <span class="name">${esc(profile.username)}</span>
+      <button class="${chipCls}" id="userChip" type="button" title="Account settings">
+        <span class="${avatarCls}">${hasName ? esc(initials(profile.username)) : '?'}</span>
+        <span class="name">${esc(displayName)}</span>
+        ${!hasName ? '<span class="warn-badge">Required</span>' : ''}
       </button>
-      <button class="btn btn-ghost" id="logoutBtn">Log out</button>`;
+      <button class="btn btn-ghost" id="logoutBtn" type="button">Log out</button>`;
     $('logoutBtn').addEventListener('click', logout);
     $('userChip').addEventListener('click', () => openAccountModal());
   }
   bindAuthButtons();
+  renderHeroCta(hasUser);
 }
+
 function bindAuthButtons() {
   document.querySelectorAll('[data-open-auth]').forEach((el) => {
     el.onclick = () => openAuthModal(el.dataset.openAuth);
   });
+}
+
+/* =========================================================
+   HERO CTA — swaps based on auth state
+   ========================================================= */
+function renderHeroCta(hasUser) {
+  if (!heroCtaPrimary) return;
+  // Clone to strip old listeners
+  const fresh = heroCtaPrimary.cloneNode(true);
+  heroCtaPrimary.parentNode.replaceChild(fresh, heroCtaPrimary);
+  // Re-bind ref
+  const btn = document.getElementById('heroCtaPrimary');
+
+  if (!hasUser) {
+    btn.textContent = 'Create your account';
+    btn.onclick = () => openAuthModal('signup');
+  } else {
+    const hasName = !!(currentProfile && currentProfile.username);
+    btn.textContent = hasName ? 'View your card' : 'Set your username';
+    btn.onclick = () => {
+      if (hasName) {
+        document.getElementById('youSection')?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        openAccountModal('username');
+      }
+    };
+  }
 }
 
 /* =========================================================
@@ -150,7 +184,7 @@ function setAuthMode(mode, { preserveValues = true } = {}) {
 }
 
 /* =========================================================
-   PASSWORD TOGGLE (delegated — works for every eye button)
+   PASSWORD TOGGLE (delegated)
    ========================================================= */
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.toggle-pass');
@@ -183,7 +217,6 @@ function openAccountModal(tab = null) {
 function closeAccountModal() { accountModal.hidden = true; }
 
 function setAccountTab(tab) {
-  acctTab = tab;
   document.querySelectorAll('#accountModal .modal-tabs button').forEach((b) =>
     b.classList.toggle('active', b.dataset.atab === tab)
   );
@@ -218,22 +251,29 @@ $('usernameForm').addEventListener('submit', async (e) => {
   btn.textContent = 'Saving…';
 
   try {
-    // Uniqueness check (exclude self)
     const taken = await withTimeout(getDocs(
       query(collection(db, 'users'), where('username', '==', newName))
     ));
     const clash = taken.docs.find((d) => d.id !== currentUser.uid);
     if (clash) throw new Error('That username is taken.');
 
-    // Update Firestore
-    await withTimeout(updateDoc(doc(db, 'users', currentUser.uid), { username: newName }));
-    // Update Firebase Auth displayName
+    // Ensure doc exists, then update
+    await withTimeout(setDoc(doc(db, 'users', currentUser.uid), {
+      username: newName,
+      totalScore: currentProfile?.totalScore ?? 0,
+      gamesPlayed: currentProfile?.gamesPlayed ?? 0
+    }, { merge: true }));
     await updateProfile(currentUser, { displayName: newName });
 
-    // Update local state + UI
-    currentProfile = { ...(currentProfile || {}), uid: currentUser.uid, username: newName };
+    currentProfile = {
+      ...(currentProfile || {}),
+      uid: currentUser.uid,
+      username: newName,
+      totalScore: currentProfile?.totalScore ?? 0,
+      gamesPlayed: currentProfile?.gamesPlayed ?? 0
+    };
     writeCache(currentProfile);
-    paintNavFromProfile(currentProfile);
+    paintNav({ hasUser: true, profile: currentProfile });
     $('currentUsername').value = newName;
     $('newUsername').value = '';
     renderYou();
@@ -268,11 +308,9 @@ $('passwordForm').addEventListener('submit', async (e) => {
   btn.textContent = 'Updating…';
 
   try {
-    // Re-auth is required by Firebase before a password change
     const cred = EmailAuthProvider.credential(currentUser.email, current);
     await reauthenticateWithCredential(currentUser, cred);
     await updatePassword(currentUser, next);
-
     $('currentPassword').value = '';
     $('newPassword').value = '';
     showToast('Password updated 🔒');
@@ -295,7 +333,6 @@ async function handleSignup(username, email, password) {
   if (!taken.empty) throw new Error('That username is taken.');
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
-  // NOTE: no email on the doc — it lives in Firebase Auth only
   const profile = {
     username,
     totalScore: 0,
@@ -326,10 +363,10 @@ form.addEventListener('submit', async (e) => {
         throw new Error('Username: 3–16 chars, letters/numbers/underscore only.');
       if (password.length < 6) throw new Error('Password needs at least 6 characters.');
       const profile = await handleSignup(username, email, password);
-      const cached = { uid: profile.uid, username: profile.username, totalScore: 0, gamesPlayed: 0 };
-      writeCache(cached);
-      currentProfile = cached;
-      paintNavFromProfile(cached);
+      // Optimistic paint — Firebase will reconcile via onAuthStateChanged
+      currentProfile = { uid: profile.uid, username: profile.username, totalScore: 0, gamesPlayed: 0 };
+      writeCache(currentProfile);
+      paintNav({ hasUser: true, profile: currentProfile });
       showToast(`Welcome to the League, ${username}! 🎮`);
     } else {
       await signInWithEmailAndPassword(auth, email, password);
@@ -350,7 +387,7 @@ async function logout() {
   writeCache(null);
   currentUser = null;
   currentProfile = null;
-  paintNavFromProfile(null);
+  paintNav({ hasUser: false });
   youSection.hidden = true;
   closeAccountModal();
   showToast('Logged out.');
@@ -383,7 +420,9 @@ async function renderBoard() {
       const u = d.data();
       const isMe = currentUser && d.id === currentUser.uid;
       const rankClass = i < 3 ? 'rank gold' : 'rank';
-      const name = u.username ? esc(u.username) : '<span style="color:var(--muted)">(no username)</span>';
+      const name = u.username
+        ? esc(u.username)
+        : '<span style="color:var(--muted)">(no username)</span>';
       return `
         <div class="row ${isMe ? 'me' : ''}">
           <div class="${rankClass}">${medals[i] || '#' + (i + 1)}</div>
@@ -424,7 +463,7 @@ async function renderYou() {
 }
 
 /* =========================================================
-   SETUP BANNER — nudge users without a username
+   SETUP BANNER
    ========================================================= */
 function renderSetupBanner(show) {
   let el = document.getElementById('setupBanner');
@@ -445,14 +484,15 @@ function renderSetupBanner(show) {
    BOOT
    ========================================================= */
 
-// STEP 1 — instant paint from cache
+// STEP 1 — instant paint from cache. If cache exists → we know a user was
+// logged in last session, so paint user view immediately (no flash).
 (function instantPaint() {
   const cached = readCache();
-  if (cached && cached.username) {
+  if (cached && cached.uid) {
     currentProfile = cached;
-    paintNavFromProfile(cached);
+    paintNav({ hasUser: true, profile: cached });
   } else {
-    paintNavFromProfile(null);
+    paintNav({ hasUser: false });
   }
   renderBoard();
   $('year').textContent = new Date().getFullYear();
@@ -464,72 +504,30 @@ if (FIREBASE_READY) {
     currentUser = user;
 
     if (!user) {
+      // Truly logged out
       currentProfile = null;
       writeCache(null);
-      paintNavFromProfile(null);
+      paintNav({ hasUser: false });
       youSection.hidden = true;
       renderSetupBanner(false);
       renderBoard();
       return;
     }
 
+    // Logged in — fetch profile
     try {
       const snap = await withTimeout(getDoc(doc(db, 'users', user.uid)));
+      const data = snap.exists() ? snap.data() : {};
 
-      if (snap.exists() && snap.data().username) {
-        // Happy path — use Firestore username (source of truth)
-        currentProfile = { uid: user.uid, ...snap.data() };
-        writeCache(currentProfile);
-        paintNavFromProfile(currentProfile);
-        renderSetupBanner(false);
-        renderYou();
-      } else {
-        // Broken/incomplete profile — no username. Show a placeholder
-        // in the nav, but do NOT use email prefix as the "name".
-        currentProfile = {
-          uid: user.uid,
-          username: snap.exists() ? snap.data().username : '',
-          totalScore: snap.data()?.totalScore || 0,
-          gamesPlayed: snap.data()?.gamesPlayed || 0
-        };
-        paintNavFromProfile(currentProfile); // paints guest-style if no username
-        renderSetupBanner(true);
+      currentProfile = {
+        uid: user.uid,
+        username: data.username || '',
+        totalScore: data.totalScore || 0,
+        gamesPlayed: data.gamesPlayed || 0
+      };
+      writeCache(currentProfile);
+      paintNav({ hasUser: true, profile: currentProfile });
 
-        // Auto-open the account modal on the username tab so they fix it now
-        setTimeout(() => openAccountModal('username'), 400);
-      }
-      renderBoard();
-    } catch (err) {
-      console.error('[reconcile]', err);
-      const cached = readCache();
-      if (cached?.username) {
-        currentProfile = cached;
-        paintNavFromProfile(cached);
-      }
-    }
-  });
-} else {
-  renderYou();
-}
-
-/* =========================================================
-   EVENTS
-   ========================================================= */
-document.querySelectorAll('#authModal .modal-tabs button').forEach((b) =>
-  b.addEventListener('click', () => setAuthMode(b.dataset.tab, { preserveValues: true }))
-);
-$('modalClose').addEventListener('click', closeAuthModal);
-authModal.addEventListener('click', (e) => { if (e.target === authModal) closeAuthModal(); });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeAuthModal(); closeAccountModal(); }
-});
-
-/* =========================================================
-   GAME API
-   ========================================================= */
-window.DL = {
-  get user() { return currentUser; },
-  get profile() { return currentProfile; },
-  async submitScore(score) {
-    if (!currentUser || !db) throw new Error('Sign in first.');
-    if (!currentProfile?.username) throw new Error('Set a user
+      if (!currentProfile.username) {
+        // Logged in but no username — nudge, don't auto-open modal
+        renderSetupBa
