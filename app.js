@@ -532,19 +532,4 @@ window.DL = {
   get profile() { return currentProfile; },
   async submitScore(score) {
     if (!currentUser || !db) throw new Error('Sign in first.');
-    if (!currentProfile?.username) throw new Error('Set a username before submitting scores.');
-    const n = Math.max(0, Math.floor(Number(score) || 0));
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      totalScore: increment(n),
-      gamesPlayed: increment(1)
-    });
-    if (currentProfile) {
-      currentProfile.totalScore = (currentProfile.totalScore || 0) + n;
-      currentProfile.gamesPlayed = (currentProfile.gamesPlayed || 0) + 1;
-      writeCache(currentProfile);
-      renderYou();
-    }
-    renderBoard();
-    return n;
-  }
-};
+    if (!currentProfile?.username) throw new Error('Set a user
