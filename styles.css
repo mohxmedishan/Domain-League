@@ -323,3 +323,48 @@ body {
   .stat strong { font-size: 21px; }
   .nav-auth .user-chip span.name { display: none; }
 }
+/* ---------- CLICKABLE USER CHIP ---------- */
+.nav-auth .user-chip {
+  background: none; border: 1px solid transparent;
+  padding: 5px 10px 5px 6px; border-radius: 100px;
+  cursor: pointer; transition: background .15s, border-color .15s;
+  color: var(--text); font-family: var(--font-body);
+}
+.nav-auth .user-chip:hover {
+  background: var(--surface-2); border-color: var(--border);
+}
+.nav-auth .user-chip:focus-visible {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124,92,255,.22);
+}
+
+/* ---------- ACCOUNT MODAL ---------- */
+.modal-title {
+  font-family: var(--font-display); font-size: 22px;
+  letter-spacing: -0.6px; margin-bottom: 4px;
+}
+.modal-sub {
+  font-size: 13px; color: var(--muted); margin-bottom: 22px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.modal-sub strong { color: var(--text); font-weight: 600; }
+
+.field input:disabled {
+  opacity: .55; cursor: not-allowed;
+  background: var(--surface-2); color: var(--muted);
+}
+
+/* ---------- INLINE "SET A USERNAME" BANNER ---------- */
+.setup-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: rgba(124,92,255,.10);
+  border: 1px solid rgba(124,92,255,.35);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin: 0 auto 26px;
+  max-width: 720px;
+  font-size: 14px;
+  position: relative; z-index: 1;
+}
+.setup-banner p { margin: 0; flex: 1; min-width: 200px; color: var(--text); }
+.setup-banner .btn { padding: 8px 16px; font-size: 13px; }
