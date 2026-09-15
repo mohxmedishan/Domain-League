@@ -94,27 +94,32 @@ function paintNav({ hasUser, profile }) {
   bindAuthButtons();
   renderHeroCta(hasUser);
 }
-function bindAuthButtons() {
-  document.querySelectorAll('[data-open-auth]').forEach((el) => {
-    el.onclick = () => openAuthModal(el.dataset.openAuth);
-  });
-}
 function renderHeroCta(hasUser) {
-  if (!heroCtaPrimary) return;
-  const fresh = heroCtaPrimary.cloneNode(true);
-  heroCtaPrimary.parentNode.replaceChild(fresh, heroCtaPrimary);
   const btn = document.getElementById('heroCtaPrimary');
+  if (!btn) return;
   if (!hasUser) {
     btn.textContent = 'Create your account';
     btn.onclick = () => openAuthModal('signup');
-  } else {
-    const hasName = !!(currentProfile && currentProfile.username);
-    btn.textContent = hasName ? 'View your card' : 'Set your username';
-    btn.onclick = () => {
-      if (hasName) document.getElementById('youSection')?.scrollIntoView({ behavior: 'smooth' });
-      else openAccountModal('username');
-    };
+    return;
   }
+  const hasName = !!(currentProfile && currentProfile.username);
+  btn.textContent = hasName ? 'View your card' : 'Set your username';
+  btn.onclick = () => {
+    if (!hasName) {
+      openAccountModal('username');
+      return;
+    }
+    // Make sure the card is visible before scrolling to it
+    youSection.hidden = false;
+    youSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Flash it so you can see it's the target
+    youSection.animate(
+      [{ outline: '2px solid transparent' },
+       { outline: '2px solid var(--accent)' },
+       { outline: '2px solid transparent' }],
+      { duration: 1200, easing: 'ease-out' }
+    );
+  };
 }
 
 /* ---------- AUTH MODAL ---------- */
