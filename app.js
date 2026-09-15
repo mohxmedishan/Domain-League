@@ -1,53 +1,18 @@
-import { firebaseConfig, FIREBASE_READY } from './firebase-config.js';
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+// app.js — Domain League UI
 import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  FIREBASE_READY, auth, db,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword,
   doc, setDoc, getDoc, updateDoc, increment,
   collection, query, orderBy, limit, getDocs, where, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+} from './firebase.js';
 
-/* =========================================================
-   INIT
-   ========================================================= */
-let auth = null, db = null;
-if (FIREBASE_READY) {
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-  });
-}
-
-/* =========================================================
-   USER CACHE
-   ========================================================= */
 const CACHE_KEY = 'dl_user_cache_v2';
-function readCache() {
-  try { const r = localStorage.getItem(CACHE_KEY); return r ? JSON.parse(r) : null; }
-  catch { return null; }
-}
-function writeCache(profile) {
-  try {
-    if (profile && profile.uid) localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
-    else localStorage.removeItem(CACHE_KEY);
-  } catch {}
-}
-
-/* =========================================================
-   STATE
-   ========================================================= */
-let currentUser = null;      // Firebase user (source of truth: logged in?)
-let currentProfile = null;   // { uid, username, totalScore, gamesPlayed }
+let currentUser = null;
+let currentProfile = null;
 let authMode = 'login';
 
-/* =========================================================
-   DOM
-   ========================================================= */
 const $ = (id) => document.getElementById(id);
 const navAuth = $('navAuth');
 const authModal = $('authModal');
@@ -61,9 +26,20 @@ const youSection = $('youSection');
 const toast = $('toast');
 const heroCtaPrimary = $('heroCtaPrimary');
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,16}$/;
+const ERRORS = {
+  'auth/email-already-in-use': 'That email is already registered.',
+  'auth/invalid-email': 'That email looks invalid.',
+  'auth/weak-password': 'Password needs at least 6 characters.',
+  'auth/user-not-found': 'No account found with that email.',
+  'auth/wrong-password': 'Incorrect password.',
+  'auth/invalid-credential': 'Wrong email or password.',
+  'auth/too-many-requests': 'Too many attempts. Try again later.',
+  'auth/network-request-failed': 'Network error. Check your connection.',
+  'auth/operation-not-allowed': 'Email/password auth is disabled in Firebase.',
+  'auth/requires-recent-login': 'Please log in again to change your password.'
+};
+
 function showToast(msg, ms = 2600) {
   toast.textContent = msg;
   toast.hidden = false;
@@ -79,29 +55,22 @@ function esc(str) {
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
-    new Promise((_, rej) =>
-      setTimeout(() => rej(new Error('Request timed out. Check your connection.')), ms))
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Request timed out.')), ms))
   ]);
 }
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,16}$/;
-
-const ERRORS = {
-  'auth/email-already-in-use': 'That email is already registered.',
-  'auth/invalid-email': 'That email looks invalid.',
-  'auth/weak-password': 'Password needs at least 6 characters.',
-  'auth/user-not-found': 'No account found with that email.',
-  'auth/wrong-password': 'Incorrect password.',
-  'auth/invalid-credential': 'Wrong email or password.',
-  'auth/too-many-requests': 'Too many attempts. Try again later.',
-  'auth/network-request-failed': 'Network error. Check your connection.',
-  'auth/operation-not-allowed': 'Email/password auth is disabled in Firebase.',
-  'auth/requires-recent-login': 'Please log in again to change your password.'
-};
+function readCache() {
+  try { const r = localStorage.getItem(CACHE_KEY); return r ? JSON.parse(r) : null; }
+  catch { return null; }
+}
+function writeCache(profile) {
+  try {
+    if (profile && profile.uid) localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(CACHE_KEY);
+  } catch {}
+}
 const friendlyError = (err) => ERRORS[err?.code] || err?.message || 'Something went wrong.';
 
-/* =========================================================
-   NAV — decides guest vs. user by Firebase USER, not profile
-   ========================================================= */
+/* ---------- NAV ---------- */
 function paintNav({ hasUser, profile }) {
   if (!hasUser) {
     navAuth.innerHTML = `
@@ -113,7 +82,7 @@ function paintNav({ hasUser, profile }) {
     const avatarCls = hasName ? 'avatar' : 'avatar placeholder';
     const chipCls = hasName ? 'user-chip' : 'user-chip incomplete';
     navAuth.innerHTML = `
-      <button class="${chipCls}" id="userChip" type="button" title="Account settings">
+      <button class="${chipCls}" id="userChip" type="button">
         <span class="${avatarCls}">${hasName ? esc(initials(profile.username)) : '?'}</span>
         <span class="name">${esc(displayName)}</span>
         ${!hasName ? '<span class="warn-badge">Required</span>' : ''}
@@ -125,24 +94,16 @@ function paintNav({ hasUser, profile }) {
   bindAuthButtons();
   renderHeroCta(hasUser);
 }
-
 function bindAuthButtons() {
   document.querySelectorAll('[data-open-auth]').forEach((el) => {
     el.onclick = () => openAuthModal(el.dataset.openAuth);
   });
 }
-
-/* =========================================================
-   HERO CTA — swaps based on auth state
-   ========================================================= */
 function renderHeroCta(hasUser) {
   if (!heroCtaPrimary) return;
-  // Clone to strip old listeners
   const fresh = heroCtaPrimary.cloneNode(true);
   heroCtaPrimary.parentNode.replaceChild(fresh, heroCtaPrimary);
-  // Re-bind ref
   const btn = document.getElementById('heroCtaPrimary');
-
   if (!hasUser) {
     btn.textContent = 'Create your account';
     btn.onclick = () => openAuthModal('signup');
@@ -150,18 +111,13 @@ function renderHeroCta(hasUser) {
     const hasName = !!(currentProfile && currentProfile.username);
     btn.textContent = hasName ? 'View your card' : 'Set your username';
     btn.onclick = () => {
-      if (hasName) {
-        document.getElementById('youSection')?.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        openAccountModal('username');
-      }
+      if (hasName) document.getElementById('youSection')?.scrollIntoView({ behavior: 'smooth' });
+      else openAccountModal('username');
     };
   }
 }
 
-/* =========================================================
-   AUTH MODAL
-   ========================================================= */
+/* ---------- AUTH MODAL ---------- */
 function openAuthModal(mode = 'login') {
   setAuthMode(mode, { preserveValues: false });
   authModal.hidden = false;
@@ -169,7 +125,6 @@ function openAuthModal(mode = 'login') {
   setTimeout(() => (mode === 'signup' ? $('username') : $('email')).focus(), 60);
 }
 function closeAuthModal() { authModal.hidden = true; }
-
 function setAuthMode(mode, { preserveValues = true } = {}) {
   authMode = mode;
   document.querySelectorAll('#authModal .modal-tabs button').forEach((b) =>
@@ -183,9 +138,7 @@ function setAuthMode(mode, { preserveValues = true } = {}) {
   if (!preserveValues) form.reset();
 }
 
-/* =========================================================
-   PASSWORD TOGGLE (delegated)
-   ========================================================= */
+/* ---------- PASSWORD TOGGLE (delegated) ---------- */
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.toggle-pass');
   if (!btn) return;
@@ -198,9 +151,7 @@ document.addEventListener('click', (e) => {
   btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
 });
 
-/* =========================================================
-   ACCOUNT MODAL
-   ========================================================= */
+/* ---------- ACCOUNT MODAL ---------- */
 function openAccountModal(tab = null) {
   if (!currentUser) return;
   $('acctEmail').textContent = currentUser.email || '—';
@@ -210,12 +161,11 @@ function openAccountModal(tab = null) {
   $('newPassword').value = '';
   $('usernameError').textContent = '';
   $('passwordError').textContent = '';
-  setAccountTab(tab || (currentProfile?.username ? 'username' : 'username'));
+  setAccountTab(tab || 'username');
   accountModal.hidden = false;
   setTimeout(() => (tab === 'password' ? $('currentPassword') : $('newUsername')).focus(), 60);
 }
 function closeAccountModal() { accountModal.hidden = true; }
-
 function setAccountTab(tab) {
   document.querySelectorAll('#accountModal .modal-tabs button').forEach((b) =>
     b.classList.toggle('active', b.dataset.atab === tab)
@@ -226,52 +176,31 @@ function setAccountTab(tab) {
   $('passwordError').textContent = '';
 }
 
-document.querySelectorAll('#accountModal .modal-tabs button').forEach((b) =>
-  b.addEventListener('click', () => setAccountTab(b.dataset.atab))
-);
-$('accountClose').addEventListener('click', closeAccountModal);
-accountModal.addEventListener('click', (e) => { if (e.target === accountModal) closeAccountModal(); });
-
 /* ---------- CHANGE USERNAME ---------- */
 $('usernameForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const errEl = $('usernameError');
   const btn = $('saveUsernameBtn');
   errEl.textContent = '';
-
   const newName = $('newUsername').value.trim();
   if (!currentUser) return errEl.textContent = 'Not signed in.';
-  if (!USERNAME_RE.test(newName))
-    return errEl.textContent = '3–16 chars, letters/numbers/underscore only.';
-  if (newName === currentProfile?.username)
-    return errEl.textContent = "That's already your username.";
-
+  if (!USERNAME_RE.test(newName)) return errEl.textContent = '3–16 chars, letters/numbers/underscore only.';
+  if (newName === currentProfile?.username) return errEl.textContent = "That's already your username.";
   btn.disabled = true;
   const prev = btn.textContent;
   btn.textContent = 'Saving…';
-
   try {
-    const taken = await withTimeout(getDocs(
-      query(collection(db, 'users'), where('username', '==', newName))
-    ));
+    const taken = await withTimeout(getDocs(query(collection(db, 'users'), where('username', '==', newName))));
     const clash = taken.docs.find((d) => d.id !== currentUser.uid);
     if (clash) throw new Error('That username is taken.');
-
-    // Ensure doc exists, then update
     await withTimeout(setDoc(doc(db, 'users', currentUser.uid), {
       username: newName,
       totalScore: currentProfile?.totalScore ?? 0,
       gamesPlayed: currentProfile?.gamesPlayed ?? 0
     }, { merge: true }));
     await updateProfile(currentUser, { displayName: newName });
-
-    currentProfile = {
-      ...(currentProfile || {}),
-      uid: currentUser.uid,
-      username: newName,
-      totalScore: currentProfile?.totalScore ?? 0,
-      gamesPlayed: currentProfile?.gamesPlayed ?? 0
-    };
+    currentProfile = { ...(currentProfile || {}), uid: currentUser.uid, username: newName,
+      totalScore: currentProfile?.totalScore ?? 0, gamesPlayed: currentProfile?.gamesPlayed ?? 0 };
     writeCache(currentProfile);
     paintNav({ hasUser: true, profile: currentProfile });
     $('currentUsername').value = newName;
@@ -280,12 +209,8 @@ $('usernameForm').addEventListener('submit', async (e) => {
     renderBoard();
     showToast('Username updated ✅');
     setTimeout(closeAccountModal, 500);
-  } catch (err) {
-    errEl.textContent = friendlyError(err);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = prev;
-  }
+  } catch (err) { errEl.textContent = friendlyError(err); }
+  finally { btn.disabled = false; btn.textContent = prev; }
 });
 
 /* ---------- CHANGE PASSWORD ---------- */
@@ -294,19 +219,15 @@ $('passwordForm').addEventListener('submit', async (e) => {
   const errEl = $('passwordError');
   const btn = $('savePasswordBtn');
   errEl.textContent = '';
-
   const current = $('currentPassword').value;
   const next = $('newPassword').value;
-
   if (!currentUser?.email) return errEl.textContent = 'Not signed in.';
   if (!current) return errEl.textContent = 'Enter your current password.';
   if (next.length < 6) return errEl.textContent = 'New password needs at least 6 characters.';
   if (next === current) return errEl.textContent = 'New password must be different.';
-
   btn.disabled = true;
   const prev = btn.textContent;
   btn.textContent = 'Updating…';
-
   try {
     const cred = EmailAuthProvider.credential(currentUser.email, current);
     await reauthenticateWithCredential(currentUser, cred);
@@ -315,30 +236,16 @@ $('passwordForm').addEventListener('submit', async (e) => {
     $('newPassword').value = '';
     showToast('Password updated 🔒');
     setTimeout(closeAccountModal, 500);
-  } catch (err) {
-    errEl.textContent = friendlyError(err);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = prev;
-  }
+  } catch (err) { errEl.textContent = friendlyError(err); }
+  finally { btn.disabled = false; btn.textContent = prev; }
 });
 
-/* =========================================================
-   SIGN UP / LOGIN
-   ========================================================= */
+/* ---------- SIGN UP / LOGIN ---------- */
 async function handleSignup(username, email, password) {
-  const taken = await withTimeout(getDocs(
-    query(collection(db, 'users'), where('username', '==', username))
-  ));
+  const taken = await withTimeout(getDocs(query(collection(db, 'users'), where('username', '==', username))));
   if (!taken.empty) throw new Error('That username is taken.');
-
   const cred = await createUserWithEmailAndPassword(auth, email, password);
-  const profile = {
-    username,
-    totalScore: 0,
-    gamesPlayed: 0,
-    createdAt: serverTimestamp()
-  };
+  const profile = { username, totalScore: 0, gamesPlayed: 0, createdAt: serverTimestamp() };
   await withTimeout(setDoc(doc(db, 'users', cred.user.uid), profile));
   await updateProfile(cred.user, { displayName: username });
   return { uid: cred.user.uid, username };
@@ -350,20 +257,15 @@ form.addEventListener('submit', async (e) => {
   submitBtn.disabled = true;
   const prevLabel = submitBtn.textContent;
   submitBtn.textContent = 'Working…';
-
   const username = $('username').value.trim();
   const email = $('email').value.trim();
   const password = $('password').value;
-
   try {
-    if (!FIREBASE_READY) throw new Error('Firebase not configured yet — edit firebase-config.js');
-
+    if (!FIREBASE_READY) throw new Error('Firebase not configured yet.');
     if (authMode === 'signup') {
-      if (!USERNAME_RE.test(username))
-        throw new Error('Username: 3–16 chars, letters/numbers/underscore only.');
+      if (!USERNAME_RE.test(username)) throw new Error('Username: 3–16 chars, letters/numbers/underscore only.');
       if (password.length < 6) throw new Error('Password needs at least 6 characters.');
       const profile = await handleSignup(username, email, password);
-      // Optimistic paint — Firebase will reconcile via onAuthStateChanged
       currentProfile = { uid: profile.uid, username: profile.username, totalScore: 0, gamesPlayed: 0 };
       writeCache(currentProfile);
       paintNav({ hasUser: true, profile: currentProfile });
@@ -374,12 +276,8 @@ form.addEventListener('submit', async (e) => {
     }
     closeAuthModal();
     form.reset();
-  } catch (err) {
-    formError.textContent = friendlyError(err);
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = prevLabel;
-  }
+  } catch (err) { formError.textContent = friendlyError(err); }
+  finally { submitBtn.disabled = false; submitBtn.textContent = prevLabel; }
 });
 
 async function logout() {
@@ -393,22 +291,15 @@ async function logout() {
   showToast('Logged out.');
 }
 
-/* =========================================================
-   LEADERBOARD
-   ========================================================= */
+/* ---------- LEADERBOARD ---------- */
 async function renderBoard() {
   if (!FIREBASE_READY) {
-    board.innerHTML = `<div class="board-empty">
-      🔧 Firebase isn't configured yet.<br />Add your keys to <code>firebase-config.js</code>.
-    </div>`;
+    board.innerHTML = `<div class="board-empty">🔧 Firebase isn't configured yet.</div>`;
     return;
   }
   board.innerHTML = `<div class="board-loading">Loading rankings…</div>`;
-
   try {
-    const snap = await withTimeout(getDocs(
-      query(collection(db, 'users'), orderBy('totalScore', 'desc'), limit(10))
-    ));
+    const snap = await withTimeout(getDocs(query(collection(db, 'users'), orderBy('totalScore', 'desc'), limit(10))));
     if (snap.empty) {
       board.innerHTML = `<div class="board-empty">No players yet. Be the first. 👑</div>`;
       $('statPlayers').textContent = '0';
@@ -420,34 +311,25 @@ async function renderBoard() {
       const u = d.data();
       const isMe = currentUser && d.id === currentUser.uid;
       const rankClass = i < 3 ? 'rank gold' : 'rank';
-      const name = u.username
-        ? esc(u.username)
-        : '<span style="color:var(--muted)">(no username)</span>';
-      return `
-        <div class="row ${isMe ? 'me' : ''}">
-          <div class="${rankClass}">${medals[i] || '#' + (i + 1)}</div>
-          <div class="row-name">
-            <div class="avatar">${esc(initials(u.username))}</div>
-            ${name}${isMe ? ' <span style="color:var(--muted);font-weight:400">(you)</span>' : ''}
-          </div>
-          <div class="row-score">${(u.totalScore || 0).toLocaleString()}</div>
-        </div>`;
+      const name = u.username ? esc(u.username) : '<span style="color:var(--muted)">(no username)</span>';
+      return `<div class="row ${isMe ? 'me' : ''}">
+        <div class="${rankClass}">${medals[i] || '#' + (i + 1)}</div>
+        <div class="row-name">
+          <div class="avatar">${esc(initials(u.username))}</div>
+          ${name}${isMe ? ' <span style="color:var(--muted);font-weight:400">(you)</span>' : ''}
+        </div>
+        <div class="row-score">${(u.totalScore || 0).toLocaleString()}</div>
+      </div>`;
     }).join('');
-
     $('statPlayers').textContent = snap.size.toLocaleString();
     $('statHigh').textContent = (snap.docs[0].data().totalScore || 0).toLocaleString();
   } catch (err) {
     console.error('[leaderboard]', err);
-    board.innerHTML = `<div class="board-empty">
-      Couldn't load the leaderboard.<br />
-      <span style="font-size:12px;opacity:.7">${esc(err.message)}</span>
-    </div>`;
+    board.innerHTML = `<div class="board-empty">Couldn't load the leaderboard.<br /><span style="font-size:12px;opacity:.7">${esc(err.message)}</span></div>`;
   }
 }
 
-/* =========================================================
-   YOUR CARD
-   ========================================================= */
+/* ---------- YOUR CARD ---------- */
 async function renderYou() {
   if (!currentUser || !currentProfile?.username) { youSection.hidden = true; return; }
   youSection.hidden = false;
@@ -455,16 +337,12 @@ async function renderYou() {
   $('youScore').textContent = (currentProfile.totalScore || 0).toLocaleString();
   $('youGames').textContent = currentProfile.gamesPlayed || 0;
   try {
-    const higher = await withTimeout(getDocs(
-      query(collection(db, 'users'), where('totalScore', '>', currentProfile.totalScore || 0))
-    ));
+    const higher = await withTimeout(getDocs(query(collection(db, 'users'), where('totalScore', '>', currentProfile.totalScore || 0))));
     $('youRank').textContent = '#' + (higher.size + 1);
   } catch { $('youRank').textContent = '—'; }
 }
 
-/* =========================================================
-   SETUP BANNER
-   ========================================================= */
+/* ---------- SETUP BANNER ---------- */
 function renderSetupBanner(show) {
   let el = document.getElementById('setupBanner');
   if (!show) { el?.remove(); return; }
@@ -472,20 +350,13 @@ function renderSetupBanner(show) {
   el = document.createElement('div');
   el.id = 'setupBanner';
   el.className = 'setup-banner';
-  el.innerHTML = `
-    <p>👋 You're signed in, but you haven't set a username yet — pick one so your scores show up right on the board.</p>
+  el.innerHTML = `<p>👋 You're signed in, but you haven't set a username yet — pick one so your scores show up right on the board.</p>
     <button class="btn btn-primary" id="setupBannerBtn" type="button">Set username</button>`;
-  const hero = document.querySelector('.hero');
-  hero.insertBefore(el, hero.firstChild);
+  document.querySelector('.hero').insertBefore(el, document.querySelector('.hero').firstChild);
   $('setupBannerBtn').addEventListener('click', () => openAccountModal('username'));
 }
 
-/* =========================================================
-   BOOT
-   ========================================================= */
-
-// STEP 1 — instant paint from cache. If cache exists → we know a user was
-// logged in last session, so paint user view immediately (no flash).
+/* ---------- BOOT ---------- */
 (function instantPaint() {
   const cached = readCache();
   if (cached && cached.uid) {
@@ -498,13 +369,10 @@ function renderSetupBanner(show) {
   $('year').textContent = new Date().getFullYear();
 })();
 
-// STEP 2 — reconcile with Firebase
 if (FIREBASE_READY) {
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
-
     if (!user) {
-      // Truly logged out
       currentProfile = null;
       writeCache(null);
       paintNav({ hasUser: false });
@@ -513,12 +381,9 @@ if (FIREBASE_READY) {
       renderBoard();
       return;
     }
-
-    // Logged in — fetch profile
     try {
       const snap = await withTimeout(getDoc(doc(db, 'users', user.uid)));
       const data = snap.exists() ? snap.data() : {};
-
       currentProfile = {
         uid: user.uid,
         username: data.username || '',
@@ -527,7 +392,50 @@ if (FIREBASE_READY) {
       };
       writeCache(currentProfile);
       paintNav({ hasUser: true, profile: currentProfile });
-
       if (!currentProfile.username) {
-        // Logged in but no username — nudge, don't auto-open modal
-        renderSetupBa
+        renderSetupBanner(true);
+        renderYou();
+      } else {
+        renderSetupBanner(false);
+        renderYou();
+      }
+      renderBoard();
+    } catch (err) {
+      console.error('[reconcile]', err);
+      paintNav({ hasUser: true, profile: currentProfile || readCache() || { username: '' } });
+    }
+  });
+} else {
+  renderYou();
+}
+
+/* ---------- EVENTS ---------- */
+document.querySelectorAll('#authModal .modal-tabs button').forEach((b) =>
+  b.addEventListener('click', () => setAuthMode(b.dataset.tab, { preserveValues: true }))
+);
+$('modalClose').addEventListener('click', closeAuthModal);
+authModal.addEventListener('click', (e) => { if (e.target === authModal) closeAuthModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeAuthModal(); closeAccountModal(); }
+});
+
+/* ---------- GAME API ---------- */
+window.DL = {
+  get user() { return currentUser; },
+  get profile() { return currentProfile; },
+  async submitScore(score) {
+    if (!currentUser || !db) throw new Error('Sign in first.');
+    if (!currentProfile?.username) throw new Error('Set a username before submitting scores.');
+    const n = Math.max(0, Math.floor(Number(score) || 0));
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      totalScore: increment(n),
+      gamesPlayed: increment(1)
+    });
+    currentProfile.totalScore = (currentProfile.totalScore || 0) + n;
+    currentProfile.gamesPlayed = (currentProfile.gamesPlayed || 0) + 1;
+    writeCache(currentProfile);
+    renderYou();
+    renderBoard();
+    return n;
+  }
+};
