@@ -26,7 +26,6 @@
     <a href="#arcade">Arcade</a>
     <a href="#leaderboard">Leaderboard</a>
   </nav>
-  <!-- Auth area starts hidden to guarantee zero flash -->
   <div class="nav-auth" id="navAuth" aria-live="polite"></div>
 </header>
 
@@ -99,7 +98,7 @@
   <span>Built for people who refresh leaderboards at 3am.</span>
 </footer>
 
-<!-- AUTH MODAL -->
+<!-- ============ AUTH MODAL ============ -->
 <div class="modal-backdrop" id="authModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <button class="modal-close" id="modalClose" aria-label="Close">×</button>
@@ -121,22 +120,68 @@
         <span>Password</span>
         <div class="password-wrap">
           <input type="password" id="password" placeholder="At least 6 characters" autocomplete="current-password" />
-          <button type="button" class="toggle-pass" id="togglePass" aria-label="Show password" aria-pressed="false">
-            <!-- Eye (hidden while visible) -->
-            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            <!-- Eye-off (shown while visible) -->
-            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-              <line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
+          <button type="button" class="toggle-pass" data-target="password" aria-label="Show password" aria-pressed="false">
+            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
           </button>
         </div>
       </label>
       <p class="form-error" id="formError" role="alert"></p>
       <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">Log in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ ACCOUNT SETTINGS MODAL ============ -->
+<div class="modal-backdrop" id="accountModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+    <button class="modal-close" id="accountClose" aria-label="Close">×</button>
+    <h2 id="accountTitle" class="modal-title">Account Settings</h2>
+    <p class="modal-sub">Signed in as <strong id="acctEmail">—</strong></p>
+
+    <div class="modal-tabs" role="tablist">
+      <button data-atab="username" class="active" role="tab">Username</button>
+      <button data-atab="password" role="tab">Password</button>
+    </div>
+
+    <!-- Username panel -->
+    <form id="usernameForm" novalidate>
+      <label class="field">
+        <span>Current username</span>
+        <input type="text" id="currentUsername" disabled />
+      </label>
+      <label class="field">
+        <span>New username</span>
+        <input type="text" id="newUsername" placeholder="3–16 chars, letters/numbers/underscore" autocomplete="off" spellcheck="false" maxlength="16" />
+      </label>
+      <p class="form-error" id="usernameError" role="alert"></p>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="saveUsernameBtn">Save username</button>
+    </form>
+
+    <!-- Password panel -->
+    <form id="passwordForm" novalidate hidden>
+      <label class="field">
+        <span>Current password</span>
+        <div class="password-wrap">
+          <input type="password" id="currentPassword" autocomplete="current-password" />
+          <button type="button" class="toggle-pass" data-target="currentPassword" aria-label="Show password" aria-pressed="false">
+            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+      </label>
+      <label class="field">
+        <span>New password</span>
+        <div class="password-wrap">
+          <input type="password" id="newPassword" autocomplete="new-password" placeholder="At least 6 characters" />
+          <button type="button" class="toggle-pass" data-target="newPassword" aria-label="Show password" aria-pressed="false">
+            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+      </label>
+      <p class="form-error" id="passwordError" role="alert"></p>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="savePasswordBtn">Update password</button>
     </form>
   </div>
 </div>
