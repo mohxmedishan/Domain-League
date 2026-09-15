@@ -409,12 +409,49 @@ if (FIREBASE_READY) {
   renderYou();
 }
 
-/* ---------- EVENTS ---------- */
-document.querySelectorAll('#authModal .modal-tabs button').forEach((b) =>
-  b.addEventListener('click', () => setAuthMode(b.dataset.tab, { preserveValues: true }))
-);
-$('modalClose').addEventListener('click', closeAuthModal);
-authModal.addEventListener('click', (e) => { if (e.target === authModal) closeAuthModal(); });
+/* ---------- GLOBAL EVENT DELEGATION ---------- */
+document.addEventListener('click', (e) => {
+  // 1. Password toggle (works in every form)
+  const toggle = e.target.closest('.toggle-pass');
+  if (toggle && toggle.dataset.target) {
+    const target = document.getElementById(toggle.dataset.target);
+    if (target) {
+      const show = target.type === 'password';
+      target.type = show ? 'text' : 'password';
+      toggle.classList.toggle('is-visible', show);
+      toggle.setAttribute('aria-pressed', String(show));
+      toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    }
+    return;
+  }
+
+  // 2. Close buttons
+  if (e.target.closest('#modalClose')) { closeAuthModal(); return; }
+  if (e.target.closest('#accountClose')) { closeAccountModal(); return; }
+
+  // 3. Backdrop click closes the modal
+  if (e.target.classList.contains('modal-backdrop')) {
+    if (e.target.id === 'authModal') closeAuthModal();
+    if (e.target.id === 'accountModal') closeAccountModal();
+    return;
+  }
+
+  // 4. Auth modal tabs (Log in / Sign up)
+  const authTab = e.target.closest('#authModal .modal-tabs button');
+  if (authTab && authTab.dataset.tab) {
+    setAuthMode(authTab.dataset.tab, { preserveValues: true });
+    return;
+  }
+
+  // 5. Account modal tabs (Username / Password)
+  const acctTab = e.target.closest('#accountModal .modal-tabs button');
+  if (acctTab && acctTab.dataset.atab) {
+    setAccountTab(acctTab.dataset.atab);
+    return;
+  }
+});
+
+// Escape closes any open modal
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { closeAuthModal(); closeAccountModal(); }
 });
