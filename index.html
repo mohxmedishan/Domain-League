@@ -26,10 +26,8 @@
     <a href="#arcade">Arcade</a>
     <a href="#leaderboard">Leaderboard</a>
   </nav>
-  <div class="nav-auth" id="navAuth">
-    <button class="btn btn-ghost" data-open-auth="login">Log in</button>
-    <button class="btn btn-primary" data-open-auth="signup">Sign up</button>
-  </div>
+  <!-- Auth area starts hidden to guarantee zero flash -->
+  <div class="nav-auth" id="navAuth" aria-live="polite"></div>
 </header>
 
 <!-- HERO -->
@@ -103,16 +101,17 @@
 
 <!-- AUTH MODAL -->
 <div class="modal-backdrop" id="authModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <button class="modal-close" id="modalClose" aria-label="Close">×</button>
-    <div class="modal-tabs">
-      <button data-tab="login" class="active">Log in</button>
-      <button data-tab="signup">Sign up</button>
+    <h2 id="authTitle" class="visually-hidden">Account</h2>
+    <div class="modal-tabs" role="tablist">
+      <button data-tab="login" class="active" role="tab">Log in</button>
+      <button data-tab="signup" role="tab">Sign up</button>
     </div>
-    <form id="authForm" novalidate>
-      <label class="field" id="usernameField">
+    <form id="authForm" novalidate autocomplete="on">
+      <label class="field" id="usernameField" hidden>
         <span>Username</span>
-        <input type="text" id="username" placeholder="e.g. shadowbyte" autocomplete="username" />
+        <input type="text" id="username" placeholder="e.g. shadowbyte" autocomplete="username" spellcheck="false" />
       </label>
       <label class="field">
         <span>Email</span>
@@ -120,9 +119,23 @@
       </label>
       <label class="field">
         <span>Password</span>
-        <input type="password" id="password" placeholder="At least 6 characters" autocomplete="current-password" />
+        <div class="password-wrap">
+          <input type="password" id="password" placeholder="At least 6 characters" autocomplete="current-password" />
+          <button type="button" class="toggle-pass" id="togglePass" aria-label="Show password" aria-pressed="false">
+            <!-- Eye (hidden while visible) -->
+            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <!-- Eye-off (shown while visible) -->
+            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
       </label>
-      <p class="form-error" id="formError"></p>
+      <p class="form-error" id="formError" role="alert"></p>
       <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">Log in</button>
     </form>
   </div>
