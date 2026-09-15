@@ -368,3 +368,43 @@ body {
 }
 .setup-banner p { margin: 0; flex: 1; min-width: 200px; color: var(--text); }
 .setup-banner .btn { padding: 8px 16px; font-size: 13px; }
+/* ---------- USER CHIP WITH "SET USERNAME" BADGE ---------- */
+.nav-auth .user-chip {
+  background: none; border: 1px solid transparent;
+  padding: 5px 10px 5px 6px; border-radius: 100px;
+  cursor: pointer; transition: background .15s, border-color .15s;
+  color: var(--text); font-family: var(--font-body);
+  display: inline-flex; align-items: center; gap: 9px;
+}
+.nav-auth .user-chip:hover { background: var(--surface-2); border-color: var(--border); }
+.nav-auth .user-chip:focus-visible {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124,92,255,.22);
+}
+.nav-auth .user-chip .name {
+  font-weight: 600; font-size: 14px;
+}
+.nav-auth .user-chip.incomplete {
+  border-color: rgba(255,201,60,.45);
+  background: rgba(255,201,60,.08);
+}
+.nav-auth .user-chip.incomplete:hover {
+  border-color: rgba(255,201,60,.7);
+  background: rgba(255,201,60,.14);
+}
+.nav-auth .user-chip .warn-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--gold);
+  background: rgba(255,201,60,.14);
+  padding: 2px 7px; border-radius: 6px;
+}
+
+/* ---------- AVATAR FALLBACK (unset user) ---------- */
+.avatar.placeholder {
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px dashed var(--border);
+}
+
+/* ---------- HERO CTA (both buttons share this row) ---------- */
+.hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
