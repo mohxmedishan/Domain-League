@@ -3,115 +3,44 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Domain League — Small games. Big bragging rights.</title>
-<meta name="description" content="A tiny accountless arcade where you play games and climb the ranks." />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>" />
+<title>Domain League — Neon Run</title>
+<meta name="description" content="Neon Run — jump, survive, and chase the leaderboard." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◈</text></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-
-<div class="glow glow-a"></div>
-<div class="glow glow-b"></div>
-
+<div class="glow glow-a"></div><div class="glow glow-b"></div>
 <header class="nav">
-  <a href="#" class="brand">
-    <span class="brand-mark">DL</span>
-    <span class="brand-text">Domain League</span>
-  </a>
-  <nav class="nav-links">
-    <a href="#arcade">Arcade</a>
-    <a href="#leaderboard">Leaderboard</a>
-  </nav>
-  <div class="nav-auth" id="navAuth" aria-live="polite"></div>
+  <a href="#top" class="brand"><span class="brand-mark">DL</span><span class="brand-text">Domain League</span></a>
+  <nav class="nav-links"><a href="#game">Neon Run</a><a href="#leaderboard">Leaderboard</a></nav>
+  <div class="player-chip"><span class="mini-avatar" id="navAvatar">G</span><span id="navName">Guest</span></div>
 </header>
-
+<main id="top">
 <section class="hero">
-  <div class="pill">🎮 Season 1 — Play instantly</div>
-  <h1>Small games.<br /><span class="grad">Big bragging rights.</span></h1>
-  <p class="hero-sub">
-    Domain League is a tiny arcade on the internet. Play a game, chase the top
-    of the board, and prove you're built different. No account required.
-  </p>
-  <div class="hero-cta">
-    <button class="btn btn-primary btn-lg" id="heroCtaPrimary">Play now</button>
-    <a href="#arcade" class="btn btn-ghost btn-lg">Browse the arcade</a>
-  </div>
-
-  <div class="stats-bar">
-    <div class="stat"><strong id="statPlayers">—</strong><span>Top scores shown</span></div>
-    <div class="stat"><strong id="statGames">1</strong><span>Game</span></div>
-    <div class="stat"><strong id="statHigh">—</strong><span>Top score</span></div>
+  <div class="pill"><span class="live-dot"></span> GAME 01 · NEON RUN</div>
+  <h1>One square.<br><span class="grad">Zero mercy.</span></h1>
+  <p class="hero-sub">A rhythm-runner inspired by the clean brutality of Geometry Dash and the endless chase of the dinosaur game. Jump the hazards. Build speed. Don't blink.</p>
+  <div class="hero-cta"><button class="btn btn-primary btn-lg" id="playHero">Play Neon Run</button><a class="btn btn-ghost btn-lg" href="#leaderboard">View leaderboard</a></div>
+  <div class="stats-bar"><div class="stat"><strong id="statPlayers">—</strong><span>Players</span></div><div class="stat"><strong>01</strong><span>Game live</span></div><div class="stat"><strong id="statHigh">0</strong><span>Top score</span></div></div>
+</section>
+<section class="section game-section" id="game">
+  <div class="section-head"><div><div class="eyebrow">ARCADE · 01</div><h2>NEON RUN</h2><p>Jump with <b>Space</b>, <b>↑</b>, click, or tap. The longer you survive, the faster it gets.</p></div><div class="best-pill">BEST <strong id="bestScore">0</strong></div></div>
+  <div class="game-shell">
+    <div class="game-topbar"><div><span class="label">SCORE</span><strong id="score">0</strong></div><div class="run-state" id="runState">READY</div><div><span class="label">SPEED</span><strong id="speed">1.0×</strong></div></div>
+    <div class="canvas-wrap" id="canvasWrap"><canvas id="gameCanvas" aria-label="Neon Run game"></canvas><div class="game-overlay" id="startOverlay"><div class="overlay-icon">◆</div><h3>READY?</h3><p>Tap or press Space to jump.</p><button class="btn btn-primary" id="startBtn">Start run</button></div><div class="game-overlay hidden" id="gameOverOverlay"><div class="overlay-icon danger-icon">×</div><div class="over-kicker">RUN ENDED</div><h3 id="overTitle">CRASHED</h3><p>Score <strong id="finalScore">0</strong> · Best <strong id="finalBest">0</strong></p><div class="overlay-actions"><button class="btn btn-primary" id="restartBtn">Run it back</button><button class="btn btn-ghost" id="scoreBtn">Submit score</button></div><small id="submitHint">Your guest name is saved on this device.</small></div></div>
+    <div class="game-hints"><span>SPACE / ↑ / TAP <b>JUMP</b></span><span>ESC <b>PAUSE</b></span><span>R <b>RESTART</b></span></div>
   </div>
 </section>
-
-<section class="section" id="arcade">
-  <div class="section-head">
-    <h2>The Arcade</h2>
-    <p>One game live. More cooking.</p>
-  </div>
-  <div class="game-grid">
-    <article class="game-card featured">
-      <div class="game-thumb">🎯</div>
-      <div class="game-body">
-        <div class="badge">Featured</div>
-        <h3>Game 01</h3>
-        <p>Your first title goes here. Wire it up and let the grind begin.</p>
-        <button class="btn btn-primary btn-block" id="game01Btn">Play Game 01</button>
-      </div>
-    </article>
-    <article class="game-card locked"><div class="game-thumb">🔒</div><span>Slot 02</span></article>
-    <article class="game-card locked"><div class="game-thumb">🔒</div><span>Slot 03</span></article>
-  </div>
-</section>
-
 <section class="section" id="leaderboard">
-  <div class="section-head">
-    <h2>Hall of Fame</h2>
-    <p>Top 10 scores for Game 01. No accounts. No nonsense.</p>
-  </div>
-  <div class="board" id="board">
-    <div class="board-loading">Loading rankings…</div>
-  </div>
+  <div class="section-head"><div><div class="eyebrow">GLOBAL</div><h2>HALL OF FAME</h2><p>Top Neon Run scores. No accounts. Just numbers and questionable persistence.</p></div><button class="btn btn-ghost" id="refreshBoard">Refresh</button></div>
+  <div class="board" id="board"><div class="board-loading">Loading rankings…</div></div>
 </section>
-
-<section class="section" id="youSection">
-  <div class="section-head">
-    <h2>Your Card</h2>
-    <p>Stored locally on this device as <span id="youName"></span></p>
-  </div>
-  <div class="stats-bar">
-    <div class="stat"><strong id="youScore">0</strong><span>Local high score</span></div>
-    <div class="stat"><strong id="youGames">0</strong><span>Games played</span></div>
-    <div class="stat"><strong id="youRank">—</strong><span>Leaderboard rank</span></div>
-  </div>
-</section>
-
-<footer class="footer">
-  <span>© <span id="year"></span> Domain League</span>
-  <span class="dot">•</span>
-  <span>Built for people who refresh leaderboards at 3am.</span>
-</footer>
-
-<!-- Display-name editor only. There is no account system. -->
-<div class="modal-backdrop" id="nameModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
-    <button class="modal-close" id="nameClose" aria-label="Close">×</button>
-    <h2 id="nameTitle" class="modal-title">Your display name</h2>
-    <p class="modal-sub">This is saved only on this device and is used when you submit scores.</p>
-    <form id="nameForm" novalidate>
-      <label class="field">
-        <span>Display name</span>
-        <input type="text" id="playerName" maxlength="20" autocomplete="off" spellcheck="false" />
-      </label>
-      <p class="form-error" id="nameError" role="alert"></p>
-      <button type="submit" class="btn btn-primary btn-block btn-lg">Save name</button>
-    </form>
-  </div>
-</div>
-
+</main>
+<footer class="footer"><span>© <span id="year"></span> Domain League</span><span class="dot">•</span><span>Built for people who absolutely said “one more run.”</span></footer>
+<div class="modal-backdrop" id="nameModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="nameTitle"><div class="modal-mark">◈</div><h2 id="nameTitle">Choose your handle</h2><p>This stays on this device. You can change it later.</p><form id="nameForm"><label class="field"><span>Display name</span><input id="nameInput" maxlength="16" minlength="2" autocomplete="nickname" spellcheck="false" placeholder="Guest_4821" /></label><p class="form-error" id="nameError"></p><button class="btn btn-primary btn-block btn-lg" type="submit">Enter the arcade</button></form></div></div>
 <div class="toast" id="toast" hidden></div>
 <script type="module" src="app.js"></script>
 </body>
