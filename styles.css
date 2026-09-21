@@ -276,33 +276,6 @@ body {
   box-shadow: 0 0 0 3px rgba(124,92,255,.18);
 }
 
-/* ---------- PASSWORD TOGGLE ---------- */
-.password-wrap { position: relative; }
-.password-wrap input { padding-right: 46px; }
-.toggle-pass {
-  position: absolute; top: 50%; right: 6px;
-  transform: translateY(-50%);
-  width: 34px; height: 34px;
-  display: grid; place-items: center;
-  background: none; border: none; border-radius: 8px;
-  color: var(--muted); cursor: pointer;
-  transition: color .15s, background .15s;
-}
-.toggle-pass:hover { color: var(--text); background: var(--surface-2); }
-.toggle-pass:focus-visible {
-  outline: none; color: var(--accent-2);
-  box-shadow: 0 0 0 3px rgba(0,217,255,.25);
-}
-.toggle-pass .icon-eye-off { display: none; }
-.toggle-pass.is-visible .icon-eye { display: none; }
-.toggle-pass.is-visible .icon-eye-off { display: block; }
-
-.form-error {
-  color: var(--danger); font-size: 13px; min-height: 18px;
-  margin: 2px 0 12px; transition: opacity .15s;
-}
-.form-error:empty { opacity: 0; }
-
 /* ---------- TOAST ---------- */
 .toast {
   position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
@@ -354,57 +327,49 @@ body {
   background: var(--surface-2); color: var(--muted);
 }
 
-/* ---------- INLINE "SET A USERNAME" BANNER ---------- */
-.setup-banner {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: rgba(124,92,255,.10);
-  border: 1px solid rgba(124,92,255,.35);
-  border-radius: 14px;
-  padding: 14px 18px;
-  margin: 0 auto 26px;
-  max-width: 720px;
-  font-size: 14px;
-  position: relative; z-index: 1;
-}
-.setup-banner p { margin: 0; flex: 1; min-width: 200px; color: var(--text); }
-.setup-banner .btn { padding: 8px 16px; font-size: 13px; }
-/* ---------- USER CHIP WITH "SET USERNAME" BADGE ---------- */
+/* ---------- HERO CTA ---------- */
+.hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- ACCOUNTLESS PLAYER CHIP ---------- */
 .nav-auth .user-chip {
+  display: inline-flex; align-items: center; gap: 9px;
   background: none; border: 1px solid transparent;
   padding: 5px 10px 5px 6px; border-radius: 100px;
-  cursor: pointer; transition: background .15s, border-color .15s;
-  color: var(--text); font-family: var(--font-body);
-  display: inline-flex; align-items: center; gap: 9px;
+  cursor: pointer; color: var(--text); font-family: var(--font-body);
+  transition: background .15s, border-color .15s;
 }
-.nav-auth .user-chip:hover { background: var(--surface-2); border-color: var(--border); }
-.nav-auth .user-chip:focus-visible {
+.nav-auth .user-chip:hover {
+  background: var(--surface-2); border-color: var(--border);
+}
+.nav-auth .user-chip .name { font-weight: 600; font-size: 14px; }
+.you-label { color: var(--muted); font-weight: 400; font-size: 12px; }
+.error-detail { font-size: 12px; opacity: .7; }
+
+/* ---------- DISPLAY NAME MODAL ---------- */
+.modal-title {
+  font-family: var(--font-display); font-size: 22px;
+  letter-spacing: -.6px; margin-bottom: 6px;
+}
+.modal-sub {
+  font-size: 13px; color: var(--muted); margin-bottom: 22px;
+}
+.field { display: block; margin-bottom: 15px; }
+.field > span {
+  display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 7px;
+}
+.field input {
+  width: 100%; padding: 12px 14px; border-radius: 11px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-size: 15px; font-family: var(--font-body);
+  transition: border-color .16s, box-shadow .16s;
+}
+.field input:focus {
   outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124,92,255,.22);
+  box-shadow: 0 0 0 3px rgba(124,92,255,.18);
 }
-.nav-auth .user-chip .name {
-  font-weight: 600; font-size: 14px;
+.form-error {
+  color: var(--danger); font-size: 13px; min-height: 18px;
+  margin: 2px 0 12px;
 }
-.nav-auth .user-chip.incomplete {
-  border-color: rgba(255,201,60,.45);
-  background: rgba(255,201,60,.08);
-}
-.nav-auth .user-chip.incomplete:hover {
-  border-color: rgba(255,201,60,.7);
-  background: rgba(255,201,60,.14);
-}
-.nav-auth .user-chip .warn-badge {
-  font-size: 11px; font-weight: 700; letter-spacing: .4px;
-  text-transform: uppercase; color: var(--gold);
-  background: rgba(255,201,60,.14);
-  padding: 2px 7px; border-radius: 6px;
-}
-
-/* ---------- AVATAR FALLBACK (unset user) ---------- */
-.avatar.placeholder {
-  background: var(--surface-2);
-  color: var(--muted);
-  border: 1px dashed var(--border);
-}
-
-/* ---------- HERO CTA (both buttons share this row) ---------- */
-.hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.form-error:empty { opacity: 0; }

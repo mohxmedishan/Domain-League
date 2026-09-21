@@ -1,44 +1,35 @@
-// app.js — Domain League UI
+// app.js — Domain League, accountless arcade
 import {
-  FIREBASE_READY, auth, db,
-  createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, updateProfile,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword,
-  doc, setDoc, getDoc, updateDoc, increment,
-  collection, query, orderBy, limit, getDocs, where, serverTimestamp
+  FIREBASE_READY, db,
+  addDoc, collection, query, where, orderBy, limit, getDocs, serverTimestamp
 } from './firebase.js';
 
-const CACHE_KEY = 'dl_user_cache_v2';
-let currentUser = null;
-let currentProfile = null;
-let authMode = 'login';
+const GAME_ID = 'game-01';
+const PLAYER_KEY = 'dl_player_name_v1';
+const PROGRESS_KEY = 'dl_game_progress_v1';
+const SETTINGS_KEY = 'dl_settings_v1';
+const RATE_KEY = 'dl_score_rate_v1';
 
 const $ = (id) => document.getElementById(id);
 const navAuth = $('navAuth');
-const authModal = $('authModal');
-const accountModal = $('accountModal');
-const form = $('authForm');
-const formError = $('formError');
-const submitBtn = $('submitBtn');
-const usernameField = $('usernameField');
 const board = $('board');
 const youSection = $('youSection');
 const toast = $('toast');
-const heroCtaPrimary = $('heroCtaPrimary');
+const nameModal = $('nameModal');
+const nameForm = $('nameForm');
+const nameInput = $('playerName');
+const nameError = $('nameError');
 
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,16}$/;
-const ERRORS = {
-  'auth/email-already-in-use': 'That email is already registered.',
-  'auth/invalid-email': 'That email looks invalid.',
-  'auth/weak-password': 'Password needs at least 6 characters.',
-  'auth/user-not-found': 'No account found with that email.',
-  'auth/wrong-password': 'Incorrect password.',
-  'auth/invalid-credential': 'Wrong email or password.',
-  'auth/too-many-requests': 'Too many attempts. Try again later.',
-  'auth/network-request-failed': 'Network error. Check your connection.',
-  'auth/operation-not-allowed': 'Email/password auth is disabled in Firebase.',
-  'auth/requires-recent-login': 'Please log in again to change your password.'
-};
+const NAME_RE = /^[a-zA-Z0-9 _.-]{2,20}$/;
+const GAME_ID_RE = /^[a-zA-Z0-9_-]{1,40}$/;
+const SCORE_MAX = 2147483647;
+const MAX_SUBMISSIONS = 5;
+const RATE_WINDOW_MS = 30_000;
+
+const PROFANITY = [
+  'fuck','shit','bitch','cunt','nigger','nigga','faggot','fag','slut','whore',
+  'dick','pussy','cock','asshole','motherfucker'
+];
 
 function showToast(msg, ms = 2600) {
   toast.textContent = msg;
@@ -46,432 +37,325 @@ function showToast(msg, ms = 2600) {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => (toast.hidden = true), ms);
 }
-function initials(name) { return (name || '?').trim().slice(0, 2).toUpperCase() || '?'; }
+
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
+
+function initials(name) {
+  return (name || '?').trim().slice(0, 2).toUpperCase() || '?';
+}
+
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('Request timed out.')), ms))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out.')), ms))
   ]);
 }
-function readCache() {
-  try { const r = localStorage.getItem(CACHE_KEY); return r ? JSON.parse(r) : null; }
-  catch { return null; }
-}
-function writeCache(profile) {
+
+function readJSON(key, fallback) {
   try {
-    if (profile && profile.uid) localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
-    else localStorage.removeItem(CACHE_KEY);
-  } catch {}
-}
-const friendlyError = (err) => ERRORS[err?.code] || err?.message || 'Something went wrong.';
-
-/* ---------- NAV ---------- */
-function paintNav({ hasUser, profile }) {
-  if (!hasUser) {
-    navAuth.innerHTML = `
-      <button class="btn btn-ghost" data-open-auth="login" type="button">Log in</button>
-      <button class="btn btn-primary" data-open-auth="signup" type="button">Sign up</button>`;
-  } else {
-    const hasName = !!(profile && profile.username);
-    const displayName = hasName ? profile.username : 'Set username';
-    const avatarCls = hasName ? 'avatar' : 'avatar placeholder';
-    const chipCls = hasName ? 'user-chip' : 'user-chip incomplete';
-    navAuth.innerHTML = `
-      <button class="${chipCls}" id="userChip" type="button">
-        <span class="${avatarCls}">${hasName ? esc(initials(profile.username)) : '?'}</span>
-        <span class="name">${esc(displayName)}</span>
-        ${!hasName ? '<span class="warn-badge">Required</span>' : ''}
-      </button>
-      <button class="btn btn-ghost" id="logoutBtn" type="button">Log out</button>`;
-    $('logoutBtn').addEventListener('click', logout);
-    $('userChip').addEventListener('click', () => openAccountModal());
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
   }
-  bindAuthButtons();
-  renderHeroCta(hasUser);
 }
-function renderHeroCta() {
-  const btn = document.getElementById('heroCtaPrimary');
-  if (!btn) return;
 
-  // Read state DIRECTLY — never trust an argument
-  const isLoggedIn = !!currentUser || !!readCache()?.uid;
-  if (!isLoggedIn) {
-    btn.textContent = 'Create your account';
-    btn.onclick = () => openAuthModal('signup');
+function writeJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function hasProfanity(name) {
+  const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return PROFANITY.some(word => new RegExp(`(^|\\s)${word}(\\s|$)`, 'i').test(normalized));
+}
+
+function generateGuestName() {
+  return `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function getPlayerName() {
+  let name = '';
+  try { name = localStorage.getItem(PLAYER_KEY) || ''; } catch {}
+  if (NAME_RE.test(name) && !hasProfanity(name)) return name;
+
+  const generated = generateGuestName();
+  try { localStorage.setItem(PLAYER_KEY, generated); } catch {}
+  return generated;
+}
+
+function setPlayerName(name) {
+  try { localStorage.setItem(PLAYER_KEY, name); } catch {}
+}
+
+function getProgress() {
+  return readJSON(PROGRESS_KEY, {});
+}
+
+function saveProgress(gameId, progress) {
+  if (!GAME_ID_RE.test(gameId)) throw new Error('Invalid game ID.');
+  const all = getProgress();
+  all[gameId] = progress;
+  writeJSON(PROGRESS_KEY, all);
+}
+
+function getSettings() {
+  return readJSON(SETTINGS_KEY, {});
+}
+
+function setSettings(patch) {
+  writeJSON(SETTINGS_KEY, { ...getSettings(), ...patch });
+}
+
+function validateScorePayload(gameId, playerName, score) {
+  if (!GAME_ID_RE.test(String(gameId))) throw new Error('Invalid game ID.');
+  if (!NAME_RE.test(playerName)) throw new Error('Display name must be 2–20 characters.');
+  if (hasProfanity(playerName)) throw new Error('Please choose a different display name.');
+  if (!Number.isInteger(score) || score < 0 || score > SCORE_MAX) {
+    throw new Error('Score must be a valid non-negative integer.');
+  }
+}
+
+function checkRateLimit() {
+  const now = Date.now();
+  const recent = readJSON(RATE_KEY, []).filter(t => now - t < RATE_WINDOW_MS);
+  if (recent.length >= MAX_SUBMISSIONS) {
+    const wait = Math.ceil((RATE_WINDOW_MS - (now - recent[0])) / 1000);
+    throw new Error(`Too many score submissions. Try again in ${wait}s.`);
+  }
+  recent.push(now);
+  writeJSON(RATE_KEY, recent);
+}
+
+/* ---------- NAV / PLAYER NAME ---------- */
+function paintNav() {
+  const name = getPlayerName();
+  navAuth.innerHTML = `
+    <button class="user-chip" id="playerChip" type="button" title="Change display name">
+      <span class="avatar">${esc(initials(name))}</span>
+      <span class="name">${esc(name)}</span>
+    </button>`;
+  $('playerChip').addEventListener('click', () => openNameModal());
+  renderHeroCta();
+}
+
+function renderHeroCta() {
+  const btn = $('heroCtaPrimary');
+  if (!btn) return;
+  btn.textContent = 'Play now';
+  btn.onclick = () => $('arcade')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function openNameModal() {
+  nameInput.value = getPlayerName();
+  nameError.textContent = '';
+  nameModal.hidden = false;
+  setTimeout(() => nameInput.focus(), 50);
+}
+
+function closeNameModal() {
+  nameModal.hidden = true;
+}
+
+nameForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = nameInput.value.trim();
+  nameError.textContent = '';
+
+  if (!NAME_RE.test(name)) {
+    nameError.textContent = 'Use 2–20 letters, numbers, spaces, dots, hyphens or underscores.';
+    return;
+  }
+  if (hasProfanity(name)) {
+    nameError.textContent = 'That display name is not allowed.';
     return;
   }
 
-  const hasName = !!(currentProfile && currentProfile.username);
-  btn.textContent = hasName ? 'View your card' : 'Set your username';
-  btn.onclick = () => {
-    if (!hasName) { openAccountModal('username'); return; }
-    const target = document.getElementById('youSection');
-    if (target) {
-      target.hidden = false;
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-}/* ---------- AUTH MODAL ---------- */
-function openAuthModal(mode = 'login') {
-  setAuthMode(mode, { preserveValues: false });
-  authModal.hidden = false;
-  formError.textContent = '';
-  setTimeout(() => (mode === 'signup' ? $('username') : $('email')).focus(), 60);
-}
-function closeAuthModal() { authModal.hidden = true; }
-function setAuthMode(mode, { preserveValues = true } = {}) {
-  authMode = mode;
-  document.querySelectorAll('#authModal .modal-tabs button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.tab === mode)
-  );
-  usernameField.hidden = mode !== 'signup';
-  $('username').required = mode === 'signup';
-  submitBtn.textContent = mode === 'signup' ? 'Create account' : 'Log in';
-  $('password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
-  formError.textContent = '';
-  if (!preserveValues) form.reset();
-}
+  setPlayerName(name);
+  paintNav();
+  renderYou();
+  renderBoard();
+  closeNameModal();
+  showToast('Display name saved ✅');
+});
 
-/* ---------- PASSWORD TOGGLE (delegated) ---------- */
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.toggle-pass');
-  if (!btn) return;
-  const target = document.getElementById(btn.dataset.target);
-  if (!target) return;
-  const show = target.type === 'password';
-  target.type = show ? 'text' : 'password';
-  btn.classList.toggle('is-visible', show);
-  btn.setAttribute('aria-pressed', String(show));
-  btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  if (e.target.closest('#nameClose')) closeNameModal();
+  if (e.target === nameModal) closeNameModal();
 });
-
-/* ---------- ACCOUNT MODAL ---------- */
-function openAccountModal(tab = null) {
-  if (!currentUser) return;
-  $('acctEmail').textContent = currentUser.email || '—';
-  $('currentUsername').value = currentProfile?.username || '(not set)';
-  $('newUsername').value = '';
-  $('currentPassword').value = '';
-  $('newPassword').value = '';
-  $('usernameError').textContent = '';
-  $('passwordError').textContent = '';
-  setAccountTab(tab || 'username');
-  accountModal.hidden = false;
-  setTimeout(() => (tab === 'password' ? $('currentPassword') : $('newUsername')).focus(), 60);
-}
-function closeAccountModal() { accountModal.hidden = true; }
-function setAccountTab(tab) {
-  document.querySelectorAll('#accountModal .modal-tabs button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.atab === tab)
-  );
-  $('usernameForm').hidden = tab !== 'username';
-  $('passwordForm').hidden = tab !== 'password';
-  $('usernameError').textContent = '';
-  $('passwordError').textContent = '';
-}
-
-/* ---------- CHANGE USERNAME ---------- */
-$('usernameForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const errEl = $('usernameError');
-  const btn = $('saveUsernameBtn');
-  errEl.textContent = '';
-  const newName = $('newUsername').value.trim();
-  if (!currentUser) return errEl.textContent = 'Not signed in.';
-  if (!USERNAME_RE.test(newName)) return errEl.textContent = '3–16 chars, letters/numbers/underscore only.';
-  if (newName === currentProfile?.username) return errEl.textContent = "That's already your username.";
-  btn.disabled = true;
-  const prev = btn.textContent;
-  btn.textContent = 'Saving…';
-  try {
-    const taken = await withTimeout(getDocs(query(collection(db, 'users'), where('username', '==', newName))));
-    const clash = taken.docs.find((d) => d.id !== currentUser.uid);
-    if (clash) throw new Error('That username is taken.');
-    await withTimeout(setDoc(doc(db, 'users', currentUser.uid), {
-      username: newName,
-      totalScore: currentProfile?.totalScore ?? 0,
-      gamesPlayed: currentProfile?.gamesPlayed ?? 0
-    }, { merge: true }));
-    await updateProfile(currentUser, { displayName: newName });
-    currentProfile = { ...(currentProfile || {}), uid: currentUser.uid, username: newName,
-      totalScore: currentProfile?.totalScore ?? 0, gamesPlayed: currentProfile?.gamesPlayed ?? 0 };
-    writeCache(currentProfile);
-    paintNav({ hasUser: true, profile: currentProfile });
-    $('currentUsername').value = newName;
-    $('newUsername').value = '';
-    renderYou();
-    renderBoard();
-    showToast('Username updated ✅');
-    setTimeout(closeAccountModal, 500);
-  } catch (err) { errEl.textContent = friendlyError(err); }
-  finally { btn.disabled = false; btn.textContent = prev; }
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeNameModal();
 });
-
-/* ---------- CHANGE PASSWORD ---------- */
-$('passwordForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const errEl = $('passwordError');
-  const btn = $('savePasswordBtn');
-  errEl.textContent = '';
-  const current = $('currentPassword').value;
-  const next = $('newPassword').value;
-  if (!currentUser?.email) return errEl.textContent = 'Not signed in.';
-  if (!current) return errEl.textContent = 'Enter your current password.';
-  if (next.length < 6) return errEl.textContent = 'New password needs at least 6 characters.';
-  if (next === current) return errEl.textContent = 'New password must be different.';
-  btn.disabled = true;
-  const prev = btn.textContent;
-  btn.textContent = 'Updating…';
-  try {
-    const cred = EmailAuthProvider.credential(currentUser.email, current);
-    await reauthenticateWithCredential(currentUser, cred);
-    await updatePassword(currentUser, next);
-    $('currentPassword').value = '';
-    $('newPassword').value = '';
-    showToast('Password updated 🔒');
-    setTimeout(closeAccountModal, 500);
-  } catch (err) { errEl.textContent = friendlyError(err); }
-  finally { btn.disabled = false; btn.textContent = prev; }
-});
-
-/* ---------- SIGN UP / LOGIN ---------- */
-async function handleSignup(username, email, password) {
-  const taken = await withTimeout(getDocs(query(collection(db, 'users'), where('username', '==', username))));
-  if (!taken.empty) throw new Error('That username is taken.');
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
-  const profile = { username, totalScore: 0, gamesPlayed: 0, createdAt: serverTimestamp() };
-  await withTimeout(setDoc(doc(db, 'users', cred.user.uid), profile));
-  await updateProfile(cred.user, { displayName: username });
-  return { uid: cred.user.uid, username };
-}
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  formError.textContent = '';
-  submitBtn.disabled = true;
-  const prevLabel = submitBtn.textContent;
-  submitBtn.textContent = 'Working…';
-  const username = $('username').value.trim();
-  const email = $('email').value.trim();
-  const password = $('password').value;
-  try {
-    if (!FIREBASE_READY) throw new Error('Firebase not configured yet.');
-    if (authMode === 'signup') {
-      if (!USERNAME_RE.test(username)) throw new Error('Username: 3–16 chars, letters/numbers/underscore only.');
-      if (password.length < 6) throw new Error('Password needs at least 6 characters.');
-      const profile = await handleSignup(username, email, password);
-      currentProfile = { uid: profile.uid, username: profile.username, totalScore: 0, gamesPlayed: 0 };
-      writeCache(currentProfile);
-      paintNav({ hasUser: true, profile: currentProfile });
-      showToast(`Welcome to the League, ${username}! 🎮`);
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
-      showToast('Welcome back! 👋');
-    }
-    closeAuthModal();
-    form.reset();
-  } catch (err) { formError.textContent = friendlyError(err); }
-  finally { submitBtn.disabled = false; submitBtn.textContent = prevLabel; }
-});
-
-async function logout() {
-  try { await signOut(auth); } catch {}
-  writeCache(null);
-  currentUser = null;
-  currentProfile = null;
-  paintNav({ hasUser: false });
-  youSection.hidden = true;
-  closeAccountModal();
-  showToast('Logged out.');
-}
 
 /* ---------- LEADERBOARD ---------- */
-async function renderBoard() {
+async function getLeaderboard(gameId = GAME_ID, requestedLimit = 10) {
+  if (!FIREBASE_READY || !db) return [];
+  if (!GAME_ID_RE.test(gameId)) throw new Error('Invalid game ID.');
+
+  const safeLimit = Math.min(Math.max(Number(requestedLimit) || 10, 1), 50);
+  const snap = await withTimeout(
+    getDocs(query(
+      collection(db, 'scores'),
+      where('game_id', '==', gameId),
+      orderBy('score', 'desc'),
+      limit(safeLimit)
+    ))
+  );
+
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function renderBoard(gameId = GAME_ID) {
   if (!FIREBASE_READY) {
     board.innerHTML = `<div class="board-empty">🔧 Firebase isn't configured yet.</div>`;
+    $('statPlayers').textContent = '—';
+    $('statHigh').textContent = '—';
     return;
   }
+
   board.innerHTML = `<div class="board-loading">Loading rankings…</div>`;
+
   try {
-    const snap = await withTimeout(getDocs(query(collection(db, 'users'), orderBy('totalScore', 'desc'), limit(10))));
-    if (snap.empty) {
-      board.innerHTML = `<div class="board-empty">No players yet. Be the first. 👑</div>`;
+    const rows = await getLeaderboard(gameId, 10);
+
+    if (!rows.length) {
+      board.innerHTML = `<div class="board-empty">No scores yet. Be the first. 👑</div>`;
       $('statPlayers').textContent = '0';
       $('statHigh').textContent = '0';
       return;
     }
+
     const medals = ['🥇', '🥈', '🥉'];
-    board.innerHTML = snap.docs.map((d, i) => {
-      const u = d.data();
-      const isMe = currentUser && d.id === currentUser.uid;
+    const myName = getPlayerName();
+
+    board.innerHTML = rows.map((entry, i) => {
+      const name = String(entry.player_name || 'Guest');
+      const isMe = name === myName;
       const rankClass = i < 3 ? 'rank gold' : 'rank';
-      const name = u.username ? esc(u.username) : '<span style="color:var(--muted)">(no username)</span>';
+
       return `<div class="row ${isMe ? 'me' : ''}">
         <div class="${rankClass}">${medals[i] || '#' + (i + 1)}</div>
         <div class="row-name">
-          <div class="avatar">${esc(initials(u.username))}</div>
-          ${name}${isMe ? ' <span style="color:var(--muted);font-weight:400">(you)</span>' : ''}
+          <div class="avatar">${esc(initials(name))}</div>
+          ${esc(name)}${isMe ? ' <span class="you-label">(you)</span>' : ''}
         </div>
-        <div class="row-score">${(u.totalScore || 0).toLocaleString()}</div>
+        <div class="row-score">${Number(entry.score || 0).toLocaleString()}</div>
       </div>`;
     }).join('');
-    $('statPlayers').textContent = snap.size.toLocaleString();
-    $('statHigh').textContent = (snap.docs[0].data().totalScore || 0).toLocaleString();
+
+    $('statPlayers').textContent = rows.length.toLocaleString();
+    $('statHigh').textContent = Number(rows[0].score || 0).toLocaleString();
   } catch (err) {
     console.error('[leaderboard]', err);
-    board.innerHTML = `<div class="board-empty">Couldn't load the leaderboard.<br /><span style="font-size:12px;opacity:.7">${esc(err.message)}</span></div>`;
+    board.innerHTML = `
+      <div class="board-empty">
+        Couldn't load the leaderboard.
+        <br><span class="error-detail">${esc(err.message)}</span>
+      </div>`;
   }
 }
 
-/* ---------- YOUR CARD ---------- */
-async function renderYou() {
-  if (!currentUser || !currentProfile?.username) { youSection.hidden = true; return; }
+/* ---------- LOCAL PLAYER CARD ---------- */
+function renderYou() {
+  const name = getPlayerName();
+  const progress = getProgress();
+  const gameProgress = progress[GAME_ID] || {};
+  const score = Number(gameProgress.highScore || 0);
+  const games = Number(gameProgress.gamesPlayed || 0);
+
   youSection.hidden = false;
-  $('youName').textContent = currentProfile.username;
-  $('youScore').textContent = (currentProfile.totalScore || 0).toLocaleString();
-  $('youGames').textContent = currentProfile.gamesPlayed || 0;
-  try {
-    const higher = await withTimeout(getDocs(query(collection(db, 'users'), where('totalScore', '>', currentProfile.totalScore || 0))));
-    $('youRank').textContent = '#' + (higher.size + 1);
-  } catch { $('youRank').textContent = '—'; }
+  $('youName').textContent = name;
+  $('youScore').textContent = score.toLocaleString();
+  $('youGames').textContent = games.toLocaleString();
+  $('youRank').textContent = '—';
 }
 
-/* ---------- SETUP BANNER ---------- */
-function renderSetupBanner(show) {
-  let el = document.getElementById('setupBanner');
-  if (!show) { el?.remove(); return; }
-  if (el) return;
-  el = document.createElement('div');
-  el.id = 'setupBanner';
-  el.className = 'setup-banner';
-  el.innerHTML = `<p>👋 You're signed in, but you haven't set a username yet — pick one so your scores show up right on the board.</p>
-    <button class="btn btn-primary" id="setupBannerBtn" type="button">Set username</button>`;
-  document.querySelector('.hero').insertBefore(el, document.querySelector('.hero').firstChild);
-  $('setupBannerBtn').addEventListener('click', () => openAccountModal('username'));
-}
+function recordLocalGame(gameId, result = {}) {
+  const progress = getProgress();
+  const current = progress[gameId] || {};
+  const score = Number(result.score);
 
-/* ---------- BOOT ---------- */
-(function instantPaint() {
-  const cached = readCache();
-  if (cached && cached.uid) {
-    currentProfile = cached;
-    paintNav({ hasUser: true, profile: cached });
-  } else {
-    paintNav({ hasUser: false });
-  }
-  renderBoard();
-  $('year').textContent = new Date().getFullYear();
-})();
+  progress[gameId] = {
+    ...current,
+    ...result,
+    gamesPlayed: Number(current.gamesPlayed || 0) + 1,
+    highScore: Number.isFinite(score) ? Math.max(Number(current.highScore || 0), score) : Number(current.highScore || 0),
+    lastPlayedAt: Date.now()
+  };
 
-if (FIREBASE_READY) {
-  onAuthStateChanged(auth, async (user) => {
-    currentUser = user;
-    if (!user) {
-      currentProfile = null;
-      writeCache(null);
-      paintNav({ hasUser: false });
-      youSection.hidden = true;
-      renderSetupBanner(false);
-      renderBoard();
-      return;
-    }
-    try {
-      const snap = await withTimeout(getDoc(doc(db, 'users', user.uid)));
-      const data = snap.exists() ? snap.data() : {};
-      currentProfile = {
-        uid: user.uid,
-        username: data.username || '',
-        totalScore: data.totalScore || 0,
-        gamesPlayed: data.gamesPlayed || 0
-      };
-      writeCache(currentProfile);
-      paintNav({ hasUser: true, profile: currentProfile });
-      if (!currentProfile.username) {
-        renderSetupBanner(true);
-        renderYou();
-      } else {
-        renderSetupBanner(false);
-        renderYou();
-      }
-      renderBoard();
-    } catch (err) {
-      console.error('[reconcile]', err);
-      paintNav({ hasUser: true, profile: currentProfile || readCache() || { username: '' } });
-    }
-  });
-} else {
+  writeJSON(PROGRESS_KEY, progress);
   renderYou();
 }
 
-/* ---------- GLOBAL EVENT DELEGATION ---------- */
-document.addEventListener('click', (e) => {
-  // 1. Password toggle (works in every form)
-  const toggle = e.target.closest('.toggle-pass');
-  if (toggle && toggle.dataset.target) {
-    const target = document.getElementById(toggle.dataset.target);
-    if (target) {
-      const show = target.type === 'password';
-      target.type = show ? 'text' : 'password';
-      toggle.classList.toggle('is-visible', show);
-      toggle.setAttribute('aria-pressed', String(show));
-      toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-    }
-    return;
+/* ---------- SCORE SUBMISSION ---------- */
+async function submitScore(gameId, score) {
+  const playerName = getPlayerName();
+  const numericScore = Number(score);
+
+  if (!Number.isInteger(numericScore)) {
+    throw new Error('Score must be an integer.');
   }
 
-  // 2. Close buttons
-  if (e.target.closest('#modalClose')) { closeAuthModal(); return; }
-  if (e.target.closest('#accountClose')) { closeAccountModal(); return; }
+  validateScorePayload(gameId, playerName, numericScore);
+  recordLocalGame(gameId, { score: numericScore });
 
-  // 3. Backdrop click closes the modal
-  if (e.target.classList.contains('modal-backdrop')) {
-    if (e.target.id === 'authModal') closeAuthModal();
-    if (e.target.id === 'accountModal') closeAccountModal();
-    return;
+  if (!FIREBASE_READY || !db) {
+    showToast('Score saved on this device. Leaderboard is offline.');
+    return { local: true, score: numericScore, player_name: playerName };
   }
 
-  // 4. Auth modal tabs (Log in / Sign up)
-  const authTab = e.target.closest('#authModal .modal-tabs button');
-  if (authTab && authTab.dataset.tab) {
-    setAuthMode(authTab.dataset.tab, { preserveValues: true });
-    return;
-  }
+  checkRateLimit();
 
-  // 5. Account modal tabs (Username / Password)
-  const acctTab = e.target.closest('#accountModal .modal-tabs button');
-  if (acctTab && acctTab.dataset.atab) {
-    setAccountTab(acctTab.dataset.atab);
-    return;
-  }
-});
+  await withTimeout(addDoc(collection(db, 'scores'), {
+    game_id: gameId,
+    player_name: playerName,
+    score: numericScore,
+    timestamp: serverTimestamp()
+  }));
 
-// Escape closes any open modal
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeAuthModal(); closeAccountModal(); }
-});
+  await renderBoard(gameId);
+  showToast('Score submitted 🏆');
+  return { local: false, score: numericScore, player_name: playerName };
+}
 
 /* ---------- GAME API ---------- */
+// Games can use:
+//   DL.submitScore('game-01', 1234)
+//   DL.saveProgress('game-01', { level: 4, lives: 2 })
+//   DL.getProgress('game-01')
+//   DL.getSettings() / DL.setSettings({ sound: false })
+//   DL.getPlayerName() / DL.setPlayerName('Guest_1234')
 window.DL = {
-  get user() { return currentUser; },
-  get profile() { return currentProfile; },
-  async submitScore(score) {
-    if (!currentUser || !db) throw new Error('Sign in first.');
-    if (!currentProfile?.username) throw new Error('Set a username before submitting scores.');
-    const n = Math.max(0, Math.floor(Number(score) || 0));
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      totalScore: increment(n),
-      gamesPlayed: increment(1)
-    });
-    currentProfile.totalScore = (currentProfile.totalScore || 0) + n;
-    currentProfile.gamesPlayed = (currentProfile.gamesPlayed || 0) + 1;
-    writeCache(currentProfile);
+  gameId: GAME_ID,
+  get playerName() { return getPlayerName(); },
+  getPlayerName,
+  setPlayerName(name) {
+    const clean = String(name ?? '').trim();
+    if (!NAME_RE.test(clean) || hasProfanity(clean)) throw new Error('Invalid display name.');
+    setPlayerName(clean);
+    paintNav();
     renderYou();
-    renderBoard();
-    return n;
-  }
+  },
+  getProgress(gameId = GAME_ID) {
+    return getProgress()[gameId] || {};
+  },
+  saveProgress,
+  getSettings,
+  setSettings,
+  getLeaderboard,
+  submitScore,
+  recordLocalGame
 };
+
+/* ---------- BOOT ---------- */
+(function boot() {
+  // Guest identity is generated locally. No login screen, no auth state, no accounts.
+  getPlayerName();
+  paintNav();
+  renderYou();
+  renderBoard();
+  $('year').textContent = new Date().getFullYear();
+})();

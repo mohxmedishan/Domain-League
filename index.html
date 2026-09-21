@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Domain League — Small games. Big bragging rights.</title>
-<meta name="description" content="A tiny corner of the internet where you play games and climb the ranks." />
+<meta name="description" content="A tiny accountless arcade where you play games and climb the ranks." />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,7 +16,6 @@
 <div class="glow glow-a"></div>
 <div class="glow glow-b"></div>
 
-<!-- NAV -->
 <header class="nav">
   <a href="#" class="brand">
     <span class="brand-mark">DL</span>
@@ -29,27 +28,25 @@
   <div class="nav-auth" id="navAuth" aria-live="polite"></div>
 </header>
 
-<!-- HERO -->
 <section class="hero">
-  <div class="pill">🎮 Season 1 — Now Loading</div>
+  <div class="pill">🎮 Season 1 — Play instantly</div>
   <h1>Small games.<br /><span class="grad">Big bragging rights.</span></h1>
   <p class="hero-sub">
-    Domain League is a tiny arcade on the internet. Play one game, chase the top
-    of the board, and prove you're built different.
+    Domain League is a tiny arcade on the internet. Play a game, chase the top
+    of the board, and prove you're built different. No account required.
   </p>
   <div class="hero-cta">
-    <button class="btn btn-primary btn-lg" id="heroCtaPrimary">Create your account</button>
+    <button class="btn btn-primary btn-lg" id="heroCtaPrimary">Play now</button>
     <a href="#arcade" class="btn btn-ghost btn-lg">Browse the arcade</a>
   </div>
 
   <div class="stats-bar">
-    <div class="stat"><strong id="statPlayers">—</strong><span>Players</span></div>
+    <div class="stat"><strong id="statPlayers">—</strong><span>Top scores shown</span></div>
     <div class="stat"><strong id="statGames">1</strong><span>Game</span></div>
     <div class="stat"><strong id="statHigh">—</strong><span>Top score</span></div>
   </div>
 </section>
 
-<!-- ARCADE -->
 <section class="section" id="arcade">
   <div class="section-head">
     <h2>The Arcade</h2>
@@ -62,7 +59,7 @@
         <div class="badge">Featured</div>
         <h3>Game 01</h3>
         <p>Your first title goes here. Wire it up and let the grind begin.</p>
-        <button class="btn btn-primary btn-block" disabled>Coming Soon</button>
+        <button class="btn btn-primary btn-block" id="game01Btn">Play Game 01</button>
       </div>
     </article>
     <article class="game-card locked"><div class="game-thumb">🔒</div><span>Slot 02</span></article>
@@ -70,122 +67,52 @@
   </div>
 </section>
 
-<!-- LEADERBOARD -->
 <section class="section" id="leaderboard">
   <div class="section-head">
     <h2>Hall of Fame</h2>
-    <p>Top 10 players across all games.</p>
+    <p>Top 10 scores for Game 01. No accounts. No nonsense.</p>
   </div>
   <div class="board" id="board">
     <div class="board-loading">Loading rankings…</div>
   </div>
 </section>
 
-<!-- YOUR STATS -->
-<section class="section" id="youSection" hidden>
-  <div class="section-head"><h2>Your Card</h2><p>Signed in as <span id="youName"></span></p></div>
+<section class="section" id="youSection">
+  <div class="section-head">
+    <h2>Your Card</h2>
+    <p>Stored locally on this device as <span id="youName"></span></p>
+  </div>
   <div class="stats-bar">
-    <div class="stat"><strong id="youScore">0</strong><span>Total score</span></div>
+    <div class="stat"><strong id="youScore">0</strong><span>Local high score</span></div>
     <div class="stat"><strong id="youGames">0</strong><span>Games played</span></div>
-    <div class="stat"><strong id="youRank">—</strong><span>Global rank</span></div>
+    <div class="stat"><strong id="youRank">—</strong><span>Leaderboard rank</span></div>
   </div>
 </section>
 
-<!-- FOOTER -->
 <footer class="footer">
   <span>© <span id="year"></span> Domain League</span>
   <span class="dot">•</span>
   <span>Built for people who refresh leaderboards at 3am.</span>
 </footer>
 
-<!-- ============ AUTH MODAL ============ -->
-<div class="modal-backdrop" id="authModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <button class="modal-close" id="modalClose" aria-label="Close">×</button>
-    <h2 id="authTitle" class="visually-hidden">Account</h2>
-    <div class="modal-tabs" role="tablist">
-      <button data-tab="login" class="active" role="tab">Log in</button>
-      <button data-tab="signup" role="tab">Sign up</button>
-    </div>
-    <form id="authForm" novalidate autocomplete="on">
-      <label class="field" id="usernameField" hidden>
-        <span>Username</span>
-        <input type="text" id="username" placeholder="e.g. shadowbyte" autocomplete="username" spellcheck="false" />
-      </label>
+<!-- Display-name editor only. There is no account system. -->
+<div class="modal-backdrop" id="nameModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+    <button class="modal-close" id="nameClose" aria-label="Close">×</button>
+    <h2 id="nameTitle" class="modal-title">Your display name</h2>
+    <p class="modal-sub">This is saved only on this device and is used when you submit scores.</p>
+    <form id="nameForm" novalidate>
       <label class="field">
-        <span>Email</span>
-        <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+        <span>Display name</span>
+        <input type="text" id="playerName" maxlength="20" autocomplete="off" spellcheck="false" />
       </label>
-      <label class="field">
-        <span>Password</span>
-        <div class="password-wrap">
-          <input type="password" id="password" placeholder="At least 6 characters" autocomplete="current-password" />
-          <button type="button" class="toggle-pass" data-target="password" aria-label="Show password" aria-pressed="false">
-            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-          </button>
-        </div>
-      </label>
-      <p class="form-error" id="formError" role="alert"></p>
-      <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">Log in</button>
-    </form>
-  </div>
-</div>
-
-<!-- ============ ACCOUNT SETTINGS MODAL ============ -->
-<div class="modal-backdrop" id="accountModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
-    <button class="modal-close" id="accountClose" aria-label="Close">×</button>
-    <h2 id="accountTitle" class="modal-title">Account Settings</h2>
-    <p class="modal-sub">Signed in as <strong id="acctEmail">—</strong></p>
-
-    <div class="modal-tabs" role="tablist">
-      <button data-atab="username" class="active" role="tab">Username</button>
-      <button data-atab="password" role="tab">Password</button>
-    </div>
-
-    <form id="usernameForm" novalidate>
-      <label class="field">
-        <span>Current username</span>
-        <input type="text" id="currentUsername" disabled />
-      </label>
-      <label class="field">
-        <span>New username</span>
-        <input type="text" id="newUsername" placeholder="3–16 chars, letters/numbers/underscore" autocomplete="off" spellcheck="false" maxlength="16" />
-      </label>
-      <p class="form-error" id="usernameError" role="alert"></p>
-      <button type="submit" class="btn btn-primary btn-block btn-lg" id="saveUsernameBtn">Save username</button>
-    </form>
-
-    <form id="passwordForm" novalidate hidden>
-      <label class="field">
-        <span>Current password</span>
-        <div class="password-wrap">
-          <input type="password" id="currentPassword" autocomplete="current-password" />
-          <button type="button" class="toggle-pass" data-target="currentPassword" aria-label="Show password" aria-pressed="false">
-            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-          </button>
-        </div>
-      </label>
-      <label class="field">
-        <span>New password</span>
-        <div class="password-wrap">
-          <input type="password" id="newPassword" autocomplete="new-password" placeholder="At least 6 characters" />
-          <button type="button" class="toggle-pass" data-target="newPassword" aria-label="Show password" aria-pressed="false">
-            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-          </button>
-        </div>
-      </label>
-      <p class="form-error" id="passwordError" role="alert"></p>
-      <button type="submit" class="btn btn-primary btn-block btn-lg" id="savePasswordBtn">Update password</button>
+      <p class="form-error" id="nameError" role="alert"></p>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">Save name</button>
     </form>
   </div>
 </div>
 
 <div class="toast" id="toast" hidden></div>
-
 <script type="module" src="app.js"></script>
 </body>
 </html>

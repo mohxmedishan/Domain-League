@@ -1,31 +1,40 @@
-// firebase.js — all Firebase initialization + helper exports
+// firebase.js — Firebase initialization for the public, accountless leaderboard.
 import { firebaseConfig, FIREBASE_READY } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, updateProfile,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, setDoc, getDoc, updateDoc, increment,
-  collection, query, orderBy, limit, getDocs, where, serverTimestamp
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  addDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-let auth = null, db = null;
+let db = null;
+
 if (FIREBASE_READY) {
   const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
   });
 }
 
 export {
-  FIREBASE_READY, auth, db,
-  createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, updateProfile,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword,
-  doc, setDoc, getDoc, updateDoc, increment,
-  collection, query, orderBy, limit, getDocs, where, serverTimestamp
+  FIREBASE_READY,
+  db,
+  addDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  serverTimestamp
 };

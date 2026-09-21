@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public, accountless leaderboard records.
+    // The client can submit a score, but it cannot edit/delete an existing score.
+    match /scores/{scoreId} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'game_id',
+          'player_name',
+          'score',
+          'timestamp'
+        ])
+        && request.resource.data.game_id is string
+        && request.resource.data.game_id.matches('^[A-Za-z0-9_-]{1,40}$')
+        && request.resource.data.player_name is string
+        && request.resource.data.player_name.size() >= 2
+        && request.resource.data.player_name.size() <= 20
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 2147483647
+        && request.resource.data.timestamp == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // No account/user collections are used by Domain League.
+    match /users/{userId} {
+      allow read, write: if false;
+    }
+  }
+}
